@@ -1,306 +1,215 @@
-# 💜 VIVA
+# 💜 VIVA Mobile
 
-### **Virtual Intelligent Vitality Assistant**
+### Virtual Intelligent Vitality Assistant
 
 > **Every Choice Shapes Your Health.**
 
-VIVA is an AI-powered Health Decision Support System that helps users make smarter daily health decisions. Rather than simply tracking calories, workouts, or expenses, VIVA analyzes multiple aspects of a user's lifestyle—including nutrition, physical activity, health-related spending, and personal goals—to provide personalized recommendations and actionable insights.
+VIVA Mobile is the official Flutter application of the VIVA ecosystem. It serves as the user's personal AI-powered health companion, helping users make informed daily health decisions through intelligent recommendations based on nutrition, physical activity, spending habits, and personal goals.
 
 ---
 
-# 📖 About the Project
+# 📖 About
 
-Modern fitness applications provide users with large amounts of health data, but they often leave the interpretation and decision-making to the user. VIVA bridges this gap by transforming collected data into intelligent recommendations that guide users toward healthier daily choices.
-
-The application is designed as both a mobile health companion and a research-driven Decision Support System (DSS), introducing a framework that evaluates daily decisions instead of simply recording activities.
+VIVA Mobile is designed to go beyond traditional fitness tracking by transforming everyday health data into personalized recommendations. Instead of only displaying calories, workouts, or expenses, the app helps users understand what they should do next to stay aligned with their health goals.
 
 ---
 
-# 🎯 Objectives
+# ✨ Features
 
-* Help users make informed health decisions.
-* Promote healthier eating habits.
-* Encourage consistent physical activity.
-* Improve nutrition awareness.
-* Monitor health-related spending.
-* Generate personalized recommendations using AI.
-* Support long-term healthy lifestyle habits.
+## 🏠 Dashboard
 
----
-
-# ✨ Core Features
-
-## 🧠 Decision Engine
-
-The heart of VIVA.
-
-Instead of only displaying statistics, the Decision Engine evaluates user behavior and recommends the next best action based on:
-
-* Personal Goals
-* Nutrition
-* Physical Activity
-* Budget
-* Daily Habits
-* Previous Decisions
-* Progress Trends
-
----
-
-## 📷 Nutrition Facts Scanner
-
-* Scan Nutrition Facts labels
-* Barcode scanning
-* OCR text recognition
-* Instant nutrition analysis
-* Decision Score generation
-* Personalized recommendations
+- Daily Health Summary
+- Decision Score
+- Goal Progress
+- Weekly Activity
+- Quick Actions
+- AI Recommendations
 
 ---
 
 ## 🍽 Nutrition Tracking
 
-* Daily meals
-* Calories
-* Protein
-* Carbohydrates
-* Fat
-* Sugar
-* Sodium
-* Water intake
+- Log Meals
+- Nutrition Facts Scanner
+- Barcode Scanner
+- OCR Nutrition Label Recognition
+- Daily Nutrition Summary
+- Water Intake Tracking
 
 ---
 
 ## 🏋 Workout Tracking
 
-* Strength training
-* Cardio
-* Walking
-* Running
-* Cycling
-* Custom workouts
+- Strength Training
+- Cardio
+- Running
+- Walking
+- Cycling
+- Custom Exercises
 
 ---
 
-## 💰 Health Expense Tracking
+## 💰 Health Expense Tracker
 
-Track expenses related to:
+Track expenses for:
 
-* Groceries
-* Supplements
-* Protein
-* Vitamins
-* Gym Membership
-* Healthy Meals
+- Groceries
+- Healthy Meals
+- Supplements
+- Vitamins
+- Gym Membership
+- Medical Expenses
 
 ---
 
 ## 🛒 Grocery Planner
 
-* Grocery checklist
-* Healthy alternatives
-* Pantry management
-* Budget planning
+- Grocery List
+- Pantry Management
+- Healthy Alternatives
+- Budget Planning
 
 ---
 
-## 🤖 AI Recommendations
+## 🤖 AI Decision Support
 
-Examples:
+Personalized recommendations based on:
 
-* Eat more protein today.
-* Reduce sodium intake.
-* Stay within today's budget.
-* Drink more water.
-* Complete a short walk.
-* Suggested healthier alternatives.
+- Nutrition
+- Activity
+- Budget
+- User Goals
+- Previous Decisions
 
----
+Example recommendations:
 
-## 📊 Analytics
-
-* Daily Summary
-* Weekly Report
-* Monthly Progress
-* Decision Trends
-* Goal Progress
-* Nutrition Overview
+- Eat more protein today.
+- Drink more water.
+- Reduce sugar intake.
+- Complete a 20-minute walk.
+- Stay within today's grocery budget.
 
 ---
 
-# 🏆 Proposed Research Contribution
+## 📊 Reports
 
-Unlike conventional fitness applications, VIVA introduces three proposed evaluation models:
-
-### Decision Score (DS)
-
-Measures how beneficial a user's current decision is based on multiple lifestyle factors.
-
----
-
-### Goal Alignment Score (GAS)
-
-Measures how closely daily actions support the user's health goals.
+- Daily Summary
+- Weekly Report
+- Monthly Progress
+- Decision Trends
+- Goal Achievement
 
 ---
 
-### Health Investment Index (HII)
-
-Evaluates how effectively health-related spending contributes toward achieving health objectives.
-
----
-
-# 📱 Mobile Application Flow
+# 📱 Application Flow
 
 ```text
-Splash Screen
-      │
-      ▼
+Splash
+   │
 Onboarding
-      │
-      ▼
+   │
 Login / Register
-      │
-      ▼
+   │
 Health Assessment
-      │
-      ▼
+   │
 Goal Setup
-      │
-      ▼
-Home Dashboard
-      │
-      ├──────────────┐
-      ▼              ▼
-Scan Food        Log Meal
-      │              │
-      ▼              ▼
-Decision Engine Analysis
-      │
-      ▼
-Recommendation
-      │
-      ▼
-Decision Score
-      │
-      ▼
-Save Activity
-      │
-      ▼
-Progress Dashboard
+   │
+Dashboard
+   │
+├── Nutrition
+├── Workout
+├── Expenses
+├── Grocery
+└── Profile
+        │
+Decision Engine
+        │
+AI Recommendation
+        │
+Reports
 ```
 
 ---
 
 # 🛠 Technology Stack
 
-## Mobile
+## Framework
 
-* Flutter
-* Dart
-* Riverpod
-* GoRouter
-* Dio
-* Flutter Secure Storage
-* SharedPreferences / Hive
-* fl_chart
+- Flutter
+- Dart
 
-## Backend
+## State Management
 
-* Next.js
-* TypeScript
-* Prisma ORM
-* PostgreSQL
-* REST API
+- Riverpod
 
-## AI
+## Navigation
 
-* OpenAI API *(planned)*
-* Google Gemini API *(alternative)*
+- GoRouter
 
-## Services
+## Networking
 
-* Firebase Authentication *(optional)*
-* Firebase Cloud Messaging
-* Firebase Storage
+- Dio
+
+## Local Storage
+
+- Flutter Secure Storage
+- Hive
+- SharedPreferences
+
+## Charts
+
+- fl_chart
 
 ## Image Processing
 
-* Google ML Kit OCR
-* Mobile Scanner
-* Barcode Scanner
+- Google ML Kit OCR
+- Mobile Scanner
+- Barcode Scanner
+
+## Notifications
+
+- Firebase Cloud Messaging
 
 ---
 
 # 📂 Project Structure
 
 ```text
-viva/
-│
-├── mobile/
-│   ├── lib/
-│   ├── assets/
-│   ├── widgets/
-│   ├── features/
-│   ├── core/
-│   └── services/
-│
-├── backend/
-│   ├── app/
-│   ├── prisma/
-│   ├── lib/
-│   ├── routes/
-│   └── middleware/
-│
-├── docs/
-├── design/
-└── README.md
+lib/
+├── app/
+├── core/
+├── config/
+├── features/
+│   ├── authentication/
+│   ├── dashboard/
+│   ├── nutrition/
+│   ├── workout/
+│   ├── expenses/
+│   ├── grocery/
+│   ├── profile/
+│   └── ai/
+├── shared/
+├── widgets/
+├── services/
+└── main.dart
 ```
 
 ---
 
-# 🚀 Future Features
+# 🚀 Planned Features
 
-* AI Meal Planner
-* AI Grocery Planner
-* AI Health Coach
-* Receipt Scanner
-* Restaurant Menu Scanner
-* Wearable Integration
-* Apple Health Integration
-* Google Fit Integration
-* Smart Notifications
-* Community Challenges
-* Research Analytics Dashboard
+- AI Meal Planner
+- AI Grocery Planner
+- AI Health Coach
+- Receipt Scanner
+- Restaurant Scanner
+- Wearable Integration
+- Apple Health
+- Google Fit
+- Community Challenges
 
 ---
 
-# 🎨 Design Philosophy
+# 📄 License
 
-VIVA is designed around **Decision Support**, not just data tracking.
-
-Instead of overwhelming users with charts and numbers, every interaction should help answer one simple question:
-
-> **"What's the best decision I can make right now?"**
-
----
-
-# 👨‍💻 Development Team
-
-**Project Name**
-
-**VIVA – Virtual Intelligent Vitality Assistant**
-
-Developed as a Computer Science Capstone Project focused on intelligent health decision support through nutrition, activity, spending, and AI-driven recommendations.
-
----
-
-## 📜 License
-
-This project is intended for academic and research purposes. Licensing may be updated as development progresses.
-
----
-
-<p align="center">
-  <strong>💜 VIVA</strong><br>
-  <em>Every Choice Shapes Your Health.</em>
-</p>
+Academic and research purposes.
