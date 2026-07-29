@@ -58,7 +58,7 @@ class VivrantBrand extends StatelessWidget {
               'VIVRΛNT',
               style: GoogleFonts.spaceGrotesk(
                 color: ink,
-                fontSize: 16,
+                fontSize: 17.5,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2.2,
               ),
@@ -67,7 +67,7 @@ class VivrantBrand extends StatelessWidget {
               'LONG LIVE LIFE',
               style: GoogleFonts.spaceGrotesk(
                 color: muted,
-                fontSize: 9,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.6,
               ),

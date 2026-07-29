@@ -104,6 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       'WELCOME BACK',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: accent,
+                        fontSize: 13,
                         letterSpacing: 2.2,
                       ),
                     ),
@@ -114,6 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           TextSpan(
                             text: 'Come back to\n',
                             style: theme.textTheme.headlineMedium?.copyWith(
+                              fontSize: 32,
                               fontWeight: FontWeight.w700,
                               height: 1.12,
                               letterSpacing: -0.6,
@@ -122,7 +124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           TextSpan(
                             text: 'yourself',
                             style: GoogleFonts.instrumentSerif(
-                              fontSize: 36,
+                              fontSize: 40,
                               fontStyle: FontStyle.italic,
                               height: 1.05,
                               foreground: Paint()
@@ -130,7 +132,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         ? VivrantColors.darkBrandGradient
                                         : VivrantColors.brandGradient)
                                     .createShader(
-                                  const Rect.fromLTWH(0, 0, 220, 48),
+                                  const Rect.fromLTWH(0, 0, 240, 54),
                                 ),
                             ),
                           ),
@@ -143,7 +145,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: muted,
                         height: 1.5,
-                        fontSize: 13.5,
+                        fontSize: 15,
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -187,7 +189,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     hintText: 'you@example.com',
                                     prefixIcon: Icon(
                                       Icons.mail_outline_rounded,
-                                      size: 20,
+                                      size: 22,
                                       color: muted,
                                     ),
                                   ),
@@ -209,7 +211,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     hintText: 'Your password',
                                     prefixIcon: Icon(
                                       Icons.lock_outline_rounded,
-                                      size: 20,
+                                      size: 22,
                                       color: muted,
                                     ),
                                     suffixIcon: IconButton(
@@ -220,7 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         _obscure
                                             ? Icons.visibility_outlined
                                             : Icons.visibility_off_outlined,
-                                        size: 20,
+                                        size: 22,
                                         color: muted,
                                       ),
                                       onPressed: () => setState(
@@ -244,7 +246,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     ),
                                     onPressed: () =>
                                         context.push('/forgot-password'),
-                                    child: const Text('Forgot password?'),
+                                    child: const Text(
+                                      'Forgot password?',
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 if (_formError != null) ...[
@@ -278,7 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           child: Text(
                             'BUILT AROUND YOU',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 10,
+                              fontSize: 11.5,
                               letterSpacing: 1.4,
                               color: muted.withValues(alpha: 0.8),
                             ),
@@ -297,7 +305,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       children: [
                         Text(
                           'New here?',
-                          style: theme.textTheme.bodySmall,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 15,
+                          ),
                         ),
                         TextButton(
                           style: TextButton.styleFrom(
@@ -306,7 +316,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           onPressed: () => context.push('/signup'),
-                          child: const Text('Create account'),
+                          child: const Text(
+                            'Create account',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -315,7 +331,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       'Wellness guidance only — not a substitute for professional medical care.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
+                        fontSize: 12.5,
                         color: muted.withValues(alpha: 0.7),
                         height: 1.4,
                       ),
@@ -359,7 +375,7 @@ class _LoginErrorBanner extends StatelessWidget {
             child: Text(
               message,
               style: GoogleFonts.spaceGrotesk(
-                fontSize: 13,
+                fontSize: 14,
                 height: 1.35,
                 fontWeight: FontWeight.w600,
                 color: ink,
@@ -421,7 +437,7 @@ class _Pill extends StatelessWidget {
         dark ? VivrantColors.darkAccentSoft : VivrantColors.accentSoft;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: soft.withValues(alpha: dark ? 0.7 : 0.85),
         borderRadius: BorderRadius.circular(14),
@@ -430,14 +446,14 @@ class _Pill extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 15, color: accent),
+          Icon(icon, size: 17, color: accent),
           const SizedBox(width: 7),
           Flexible(
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.spaceGrotesk(
-                fontSize: 12,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w700,
                 color: accent,
               ),

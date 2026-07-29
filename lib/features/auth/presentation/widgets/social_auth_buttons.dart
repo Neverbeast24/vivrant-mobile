@@ -46,7 +46,7 @@ class _SocialAuthButtonsState extends ConsumerState<SocialAuthButtons> {
               child: Text(
                 'OR CONTINUE WITH',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 10,
+                  fontSize: 11.5,
                   letterSpacing: 1.2,
                   color: ink.withValues(alpha: 0.45),
                 ),
@@ -135,6 +135,7 @@ class _SocialButton extends StatelessWidget {
                 Text(
                   label,
                   style: theme.textTheme.labelLarge?.copyWith(
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

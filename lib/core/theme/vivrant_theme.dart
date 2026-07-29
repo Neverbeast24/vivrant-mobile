@@ -131,8 +131,12 @@ abstract final class VivrantTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: accent, width: 1.5),
         ),
-        labelStyle: TextStyle(color: muted, fontSize: 13),
-        hintStyle: TextStyle(color: muted.withValues(alpha: 0.7)),
+        labelStyle: TextStyle(color: muted, fontSize: 15),
+        floatingLabelStyle: TextStyle(color: accent, fontSize: 13),
+        hintStyle: TextStyle(
+          color: muted.withValues(alpha: 0.7),
+          fontSize: 15,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -143,7 +147,7 @@ abstract final class VivrantTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: GoogleFonts.spaceGrotesk(
             fontWeight: FontWeight.w800,
-            fontSize: 15,
+            fontSize: 16.5,
           ),
         ),
       ),
