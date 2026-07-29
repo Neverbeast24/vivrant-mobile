@@ -18,13 +18,14 @@ class VivrantPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: VivrantColors.ink.withValues(alpha: 0.08)),
+        border: Border.all(color: c.ink.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

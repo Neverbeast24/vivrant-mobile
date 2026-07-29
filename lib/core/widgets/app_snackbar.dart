@@ -5,6 +5,10 @@ import '../theme/vivrant_colors.dart';
 
 enum SnackTone { success, error, info, warning }
 
+/// Root messenger — set on [MaterialApp.router] so toasts always land.
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 /// Shows a branded floating toast. Prefer this over raw [SnackBar]s.
 void showAppSnackBar(
   BuildContext context, {
@@ -12,33 +16,55 @@ void showAppSnackBar(
   SnackTone tone = SnackTone.info,
   String? actionLabel,
   VoidCallback? onAction,
-  Duration duration = const Duration(seconds: 4),
+  Duration? duration,
 }) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.clearSnackBars();
-  messenger.showSnackBar(
-    SnackBar(
-      behavior: SnackBarBehavior.floating,
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      padding: EdgeInsets.zero,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      duration: duration,
-      dismissDirection: DismissDirection.horizontal,
-      content: _AppSnackCard(
-        message: message,
-        tone: tone,
-        actionLabel: actionLabel,
-        onAction: onAction == null
-            ? null
-            : () {
-                messenger.hideCurrentSnackBar();
-                onAction();
-              },
-        onDismiss: () => messenger.hideCurrentSnackBar(),
+  final trimmed = message.trim();
+  if (trimmed.isEmpty) return;
+
+  final showDuration = duration ??
+      (tone == SnackTone.error
+          ? const Duration(seconds: 5)
+          : const Duration(seconds: 4));
+
+  void present() {
+    final messenger =
+        rootScaffoldMessengerKey.currentState ?? ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        padding: EdgeInsets.zero,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        duration: showDuration,
+        dismissDirection: DismissDirection.horizontal,
+        content: _AppSnackCard(
+          message: trimmed,
+          tone: tone,
+          actionLabel: actionLabel,
+          onAction: onAction == null
+              ? null
+              : () {
+                  messenger.hideCurrentSnackBar();
+                  onAction();
+                },
+          onDismiss: messenger.hideCurrentSnackBar,
+        ),
       ),
-    ),
-  );
+    );
+  }
+
+  // Defer so setState/rebuilds on the same frame don't swallow the toast.
+  final binding = WidgetsBinding.instance;
+  binding.addPostFrameCallback((_) {
+    if (context.mounted || rootScaffoldMessengerKey.currentState != null) {
+      present();
+    }
+  });
 }
 
 class _AppSnackCard extends StatelessWidget {
@@ -62,21 +88,16 @@ class _AppSnackCard extends StatelessWidget {
     final style = _toneStyle(dark);
 
     return Material(
-      color: Colors.transparent,
+      color: style.background,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: dark ? 0.45 : 0.18),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
         constraints: const BoxConstraints(minHeight: 56),
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         decoration: BoxDecoration(
-          color: style.background,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: style.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,7 +223,8 @@ class _AppSnackCard extends StatelessWidget {
           iconWell: dark
               ? VivrantColors.darkCyan.withValues(alpha: 0.16)
               : VivrantColors.accentSoft,
-          border: VivrantColors.ink.withValues(alpha: dark ? 0.2 : 0.08),
+          border: (dark ? VivrantColors.darkInk : VivrantColors.ink)
+              .withValues(alpha: dark ? 0.2 : 0.08),
           foreground: dark ? VivrantColors.darkInk : VivrantColors.ink,
         );
     }

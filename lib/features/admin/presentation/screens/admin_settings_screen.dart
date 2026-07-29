@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -25,6 +26,13 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.adminSettings);
+    if (cached != null) {
+      _data = cached;
+      _loading = false;
+    }
     _load();
   }
 
@@ -36,13 +44,15 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   }
 
   Future<void> _load() async {
+    final showSpinner = _data == null;
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(vivrantApiProvider).adminSettings();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.adminSettings, data);
       setState(() {
         _data = data;
         _loading = false;

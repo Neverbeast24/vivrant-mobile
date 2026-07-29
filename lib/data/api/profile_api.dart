@@ -19,6 +19,35 @@ extension VivrantProfileApi on VivrantApi {
     );
   }
 
+  Future<String> uploadAvatar(String filePath, {String? filename}) async {
+    final name = filename ?? filePath.split(RegExp(r'[\\/]')).last;
+    final form = FormData.fromMap({
+      'avatar': await MultipartFile.fromFile(filePath, filename: name),
+    });
+    final res = await _client.postMultipart<Map<String, dynamic>>(
+      '/api/mobile/profile/avatar',
+      form,
+    );
+    final url = res.data?['avatar_url'] as String?;
+    if (url == null || url.isEmpty) {
+      throw StateError('Avatar upload succeeded but no URL was returned.');
+    }
+    return url;
+  }
+
+  Future<void> deleteAvatar() async {
+    await _client.delete('/api/mobile/profile/avatar');
+  }
+
+  Future<Map<String, dynamic>> getPreferences() async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/api/mobile/settings/preferences',
+    );
+    return Map<String, dynamic>.from(
+      res.data?['settings'] as Map? ?? res.data ?? {},
+    );
+  }
+
   Future<List<HealthGoal>> listGoals() async {
     final res = await _client.get<Map<String, dynamic>>('/api/mobile/goals');
     return (res.data?['goals'] as List? ?? [])
@@ -26,8 +55,14 @@ extension VivrantProfileApi on VivrantApi {
         .toList();
   }
 
-  Future<void> addGoal(Map<String, dynamic> body) async {
-    await _client.post('/api/mobile/goals', data: body);
+  Future<HealthGoal> addGoal(Map<String, dynamic> body) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/goals',
+      data: body,
+    );
+    return HealthGoal.fromJson(
+      Map<String, dynamic>.from(res.data?['goal'] ?? res.data ?? {}),
+    );
   }
 
   Future<void> updateGoalStatus(int id, String status) async {

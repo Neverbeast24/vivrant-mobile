@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
@@ -23,11 +24,49 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
   final _name = TextEditingController();
   final _bio = TextEditingController();
+  final _height = TextEditingController();
+  final _weight = TextEditingController();
+  final _goalWeight = TextEditingController();
+  final _steps = TextEditingController();
+  final _water = TextEditingController();
+  final _budget = TextEditingController();
   final _nameFocus = FocusNode();
   final _bioFocus = FocusNode();
+
+  DateTime? _birthDate;
+  String? _sex;
+  String? _activityLevel;
+  String? _healthFocus;
+
   bool _loading = false;
+  bool _avatarBusy = false;
   bool _initialized = false;
   late final AnimationController _enter;
+
+  static const _sexOptions = <(String, String)>[
+    ('female', 'Female'),
+    ('male', 'Male'),
+    ('non_binary', 'Non-binary'),
+    ('prefer_not_to_say', 'Prefer not to say'),
+  ];
+
+  static const _activityOptions = <(String, String)>[
+    ('sedentary', 'Sedentary'),
+    ('light', 'Lightly active'),
+    ('moderate', 'Moderately active'),
+    ('active', 'Active'),
+    ('very_active', 'Very active'),
+  ];
+
+  static const _focusOptions = <(String, String)>[
+    ('general', 'General vitality'),
+    ('weight', 'Weight management'),
+    ('strength', 'Strength'),
+    ('endurance', 'Endurance'),
+    ('nutrition', 'Nutrition'),
+    ('sleep', 'Sleep'),
+    ('stress', 'Stress management'),
+  ];
 
   @override
   void initState() {
@@ -43,6 +82,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     _enter.dispose();
     _name.dispose();
     _bio.dispose();
+    _height.dispose();
+    _weight.dispose();
+    _goalWeight.dispose();
+    _steps.dispose();
+    _water.dispose();
+    _budget.dispose();
     _nameFocus.dispose();
     _bioFocus.dispose();
     super.dispose();
@@ -52,18 +97,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (_initialized || profile == null) return;
     _name.text = profile.displayName;
     _bio.text = profile.bio ?? '';
+    _height.text = profile.heightCm?.toString() ?? '';
+    _weight.text = profile.weightKg?.toString() ?? '';
+    _goalWeight.text = profile.goalWeightKg?.toString() ?? '';
+    _steps.text = '${profile.dailyStepGoal}';
+    _water.text = '${profile.dailyWaterGoalMl}';
+    _budget.text = profile.monthlyHealthBudget?.toString() ?? '';
+    if (profile.birthDate != null && profile.birthDate!.isNotEmpty) {
+      _birthDate = DateTime.tryParse(profile.birthDate!);
+    }
+    _sex = profile.sex;
+    _activityLevel = profile.activityLevel;
+    _healthFocus = profile.healthFocus ?? 'general';
     _initialized = true;
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 25),
+      firstDate: DateTime(1920),
+      lastDate: now,
+    );
+    if (picked == null) return;
+    setState(() => _birthDate = picked);
   }
 
   Future<void> _save() async {
     HapticFeedback.lightImpact();
     setState(() => _loading = true);
     try {
-      await ref.read(vivrantApiProvider).updateProfile({
+      final body = <String, dynamic>{
         'display_name': _name.text.trim(),
-        'bio': _bio.text.trim(),
-      });
-      await ref.read(authProvider.notifier).refreshProfile();
+        'bio': _bio.text.trim().isEmpty ? null : _bio.text.trim(),
+        'birth_date': _birthDate == null
+            ? null
+            : '${_birthDate!.year.toString().padLeft(4, '0')}-'
+                '${_birthDate!.month.toString().padLeft(2, '0')}-'
+                '${_birthDate!.day.toString().padLeft(2, '0')}',
+        'sex': _sex,
+        'height_cm': double.tryParse(_height.text.trim()),
+        'weight_kg': double.tryParse(_weight.text.trim()),
+        'goal_weight_kg': double.tryParse(_goalWeight.text.trim()),
+        'activity_level': _activityLevel,
+        'health_focus': _healthFocus,
+        'daily_step_goal': int.tryParse(_steps.text.trim()) ?? 8000,
+        'daily_water_goal_ml': int.tryParse(_water.text.trim()) ?? 2500,
+        'monthly_health_budget':
+            double.tryParse(_budget.text.trim()) ?? 0,
+      };
+      final updated = await ref.read(vivrantApiProvider).updateProfile(body);
+      await ref.read(authProvider.notifier).refreshProfile(updated);
       if (!mounted) return;
       context.showSuccess('Profile updated');
     } catch (e) {
@@ -71,6 +156,112 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       context.showError(apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _removeAvatar() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove avatar?'),
+        content: const Text('Your profile photo will be cleared.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _avatarBusy = true);
+    try {
+      await ref.read(vivrantApiProvider).deleteAvatar();
+      await ref.read(authProvider.notifier).refreshProfile();
+      if (!mounted) return;
+      context.showSuccess('Avatar removed');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _avatarBusy = false);
+    }
+  }
+
+  Future<void> _showAvatarActions() async {
+    HapticFeedback.selectionClick();
+    final hasAvatar =
+        (ref.read(authProvider).profile?.avatarUrl ?? '').isNotEmpty;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from gallery'),
+                onTap: () => Navigator.pop(ctx, 'gallery'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('Take a photo'),
+                onTap: () => Navigator.pop(ctx, 'camera'),
+              ),
+              if (hasAvatar)
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Theme.of(ctx).colorScheme.error,
+                  ),
+                  title: Text(
+                    'Remove avatar',
+                    style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'remove'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (action == null || !mounted) return;
+    if (action == 'remove') {
+      await _removeAvatar();
+      return;
+    }
+
+    final source =
+        action == 'camera' ? ImageSource.camera : ImageSource.gallery;
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 88,
+    );
+    if (file == null || !mounted) return;
+
+    setState(() => _avatarBusy = true);
+    try {
+      await ref.read(vivrantApiProvider).uploadAvatar(file.path);
+      await ref.read(authProvider.notifier).refreshProfile();
+      if (!mounted) return;
+      context.showSuccess('Avatar updated');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _avatarBusy = false);
     }
   }
 
@@ -114,6 +305,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
+  String _birthLabel() {
+    if (_birthDate == null) return 'Add birth date';
+    final d = _birthDate!;
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
+  double? get _bmi {
+    final h = double.tryParse(_height.text.trim());
+    final w = double.tryParse(_weight.text.trim());
+    if (h == null || w == null || h <= 0) return null;
+    return w / ((h / 100) * (h / 100));
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(authProvider).profile;
@@ -128,6 +332,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final soft = dark ? VivrantColors.darkAccentSoft : VivrantColors.accentSoft;
     final displayName = profile?.displayName ?? _name.text;
     final email = profile?.email ?? '';
+    final bmi = _bmi;
 
     return GradientScaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -147,6 +352,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   trailing: _AvatarBadge(
                     initials: _initials(displayName),
                     avatarUrl: profile?.avatarUrl,
+                    busy: _avatarBusy,
+                    onTap: _showAvatarActions,
+                  ),
+                ),
+              ),
+              _reveal(
+                start: 0.05,
+                finish: 0.48,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _avatarBusy ? null : _showAvatarActions,
+                        icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                        label: Text(
+                          (profile?.avatarUrl ?? '').isEmpty
+                              ? 'Add photo'
+                              : 'Change photo',
+                        ),
+                      ),
+                      if ((profile?.avatarUrl ?? '').isNotEmpty)
+                        TextButton.icon(
+                          onPressed: _avatarBusy ? null : _removeAvatar,
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text('Remove'),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -232,9 +467,263 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _reveal(
+                start: 0.18,
+                finish: 0.64,
+                child: _SoftCard(
+                  color: panel,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Health profile',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Body stats used for BMI, coaching, and goals.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      InkWell(
+                        onTap: _pickBirthDate,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Birth date',
+                            prefixIcon: Icon(
+                              Icons.cake_outlined,
+                              size: 20,
+                              color: muted,
+                            ),
+                          ),
+                          child: Text(
+                            _birthLabel(),
+                            style: TextStyle(
+                              color: _birthDate == null ? muted : ink,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String?>(
+                        key: ValueKey('sex-$_sex'),
+                        initialValue: _sex,
+                        decoration: InputDecoration(
+                          labelText: 'Sex',
+                          prefixIcon: Icon(
+                            Icons.wc_outlined,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Prefer not to set'),
+                          ),
+                          ..._sexOptions.map(
+                            (o) => DropdownMenuItem(
+                              value: o.$1,
+                              child: Text(o.$2),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _sex = v),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _height,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              decoration: InputDecoration(
+                                labelText: 'Height',
+                                suffixText: 'cm',
+                                prefixIcon: Icon(
+                                  Icons.height_rounded,
+                                  size: 20,
+                                  color: muted,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _weight,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              decoration: InputDecoration(
+                                labelText: 'Weight',
+                                suffixText: 'kg',
+                                prefixIcon: Icon(
+                                  Icons.monitor_weight_outlined,
+                                  size: 20,
+                                  color: muted,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _goalWeight,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Goal weight',
+                          suffixText: 'kg',
+                          prefixIcon: Icon(
+                            Icons.flag_outlined,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                      ),
+                      if (bmi != null) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: soft,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.favorite_outline, color: accent, size: 18),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'BMI ${bmi.toStringAsFixed(1)} · screening measure only',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String?>(
+                        key: ValueKey('activity-$_activityLevel'),
+                        initialValue: _activityLevel,
+                        decoration: InputDecoration(
+                          labelText: 'Activity level',
+                          prefixIcon: Icon(
+                            Icons.directions_run_rounded,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Select activity level'),
+                          ),
+                          ..._activityOptions.map(
+                            (o) => DropdownMenuItem(
+                              value: o.$1,
+                              child: Text(o.$2),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setState(() => _activityLevel = v),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String?>(
+                        key: ValueKey('focus-$_healthFocus'),
+                        initialValue: _healthFocus,
+                        decoration: InputDecoration(
+                          labelText: 'Primary health focus',
+                          prefixIcon: Icon(
+                            Icons.spa_outlined,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                        items: _focusOptions
+                            .map(
+                              (o) => DropdownMenuItem(
+                                value: o.$1,
+                                child: Text(o.$2),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() => _healthFocus = v),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _steps,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: InputDecoration(
+                          labelText: 'Daily step goal',
+                          suffixText: 'steps',
+                          prefixIcon: Icon(
+                            Icons.directions_walk_rounded,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _water,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: InputDecoration(
+                          labelText: 'Daily water goal',
+                          suffixText: 'ml',
+                          prefixIcon: Icon(
+                            Icons.water_drop_outlined,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _budget,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Monthly health budget',
+                          suffixText: 'PHP',
+                          prefixIcon: Icon(
+                            Icons.payments_outlined,
+                            size: 20,
+                            color: muted,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 18),
                       PrimaryButton(
-                        label: _loading ? 'Saving…' : 'Save profile',
+                        label: _loading ? 'Saving…' : 'Save health profile',
                         loading: _loading,
                         onPressed: _save,
                         icon: Icons.check_rounded,
@@ -278,10 +767,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       _NavRow(
                         icon: Icons.tune_rounded,
                         title: 'Preferences',
-                        subtitle: 'Steps, water, and daily defaults',
+                        subtitle: 'Theme, alerts, and timezone',
                         accent: accent,
                         soft: soft,
                         onTap: () => context.push('/profile/preferences'),
+                      ),
+                      _Divider(color: ink),
+                      _NavRow(
+                        icon: Icons.lock_outline_rounded,
+                        title: 'Change password',
+                        subtitle: 'Update web and mobile sign-in',
+                        accent: accent,
+                        soft: soft,
+                        onTap: () => context.push('/profile/password'),
                       ),
                     ],
                   ),
@@ -307,44 +805,92 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 }
 
 class _AvatarBadge extends StatelessWidget {
-  const _AvatarBadge({required this.initials, this.avatarUrl});
+  const _AvatarBadge({
+    required this.initials,
+    this.avatarUrl,
+    this.busy = false,
+    this.onTap,
+  });
 
   final String initials;
   final String? avatarUrl;
+  final bool busy;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
     final hasImage = avatarUrl != null && avatarUrl!.isNotEmpty;
 
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: VivrantColors.brandGradient,
-        boxShadow: [
-          BoxShadow(
-            color: VivrantColors.accent.withValues(alpha: dark ? 0.28 : 0.22),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+    return GestureDetector(
+      onTap: busy ? null : onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: dark
+                  ? VivrantColors.darkBrandGradient
+                  : VivrantColors.brandGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: dark ? 0.28 : 0.22),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(2.5),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dark ? VivrantColors.darkPanel : Colors.white,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: busy
+                  ? const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                      ),
+                    )
+                  : hasImage
+                      ? Image.network(
+                          avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              _Initials(initials: initials),
+                        )
+                      : _Initials(initials: initials),
+            ),
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: dark ? VivrantColors.darkInk : VivrantColors.ink,
+                border: Border.all(
+                  color: dark ? VivrantColors.darkPanel : Colors.white,
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Icons.camera_alt_rounded,
+                size: 11,
+                color: dark ? VivrantColors.darkPanel : Colors.white,
+              ),
+            ),
           ),
         ],
-      ),
-      padding: const EdgeInsets.all(2.5),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: dark ? VivrantColors.darkPanel : Colors.white,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: hasImage
-            ? Image.network(
-                avatarUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _Initials(initials: initials),
-              )
-            : _Initials(initials: initials),
       ),
     );
   }
@@ -357,13 +903,14 @@ class _Initials extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Center(
       child: Text(
         initials,
         style: GoogleFonts.bricolageGrotesque(
           fontSize: 18,
           fontWeight: FontWeight.w700,
-          color: VivrantColors.accentDeep,
+          color: c.accentDeep,
         ),
       ),
     );
@@ -395,7 +942,8 @@ class _SoftCard extends StatelessWidget {
         border: Border.all(color: ink.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
-            color: VivrantColors.accent.withValues(alpha: dark ? 0.08 : 0.05),
+            color: (dark ? VivrantColors.darkAccent : VivrantColors.accent)
+                .withValues(alpha: dark ? 0.08 : 0.05),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),

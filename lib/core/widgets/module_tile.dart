@@ -19,6 +19,7 @@ class ModuleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Material(
       color: Theme.of(context).cardTheme.color,
       borderRadius: BorderRadius.circular(18),
@@ -29,9 +30,7 @@ class ModuleTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: VivrantColors.ink.withValues(alpha: 0.08),
-            ),
+            border: Border.all(color: c.ink.withValues(alpha: 0.08)),
           ),
           child: Row(
             children: [
@@ -39,10 +38,10 @@ class ModuleTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: VivrantColors.accentSoft,
+                  color: c.accentSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: VivrantColors.accent, size: 20),
+                child: Icon(icon, color: c.accent, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -51,18 +50,18 @@ class ModuleTile extends StatelessWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                         height: 1.25,
-                        color: VivrantColors.ink,
+                        color: c.ink,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       caption,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: VivrantColors.ink.withValues(alpha: 0.62),
+                            color: c.ink.withValues(alpha: 0.62),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             height: 1.3,
@@ -73,7 +72,7 @@ class ModuleTile extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: VivrantColors.ink.withValues(alpha: 0.35),
+                color: c.ink.withValues(alpha: 0.35),
               ),
             ],
           ),

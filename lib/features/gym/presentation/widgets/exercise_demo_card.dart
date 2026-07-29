@@ -17,6 +17,7 @@ class ExerciseDemoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     final thumb = exercise.demoThumbnailUrl?.trim();
     final hasThumb = thumb != null && thumb.isNotEmpty;
     final meta = [
@@ -34,9 +35,7 @@ class ExerciseDemoCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: VivrantColors.ink.withValues(alpha: 0.08),
-            ),
+            border: Border.all(color: c.ink.withValues(alpha: 0.08)),
           ),
           child: Row(
             children: [
@@ -53,11 +52,11 @@ class ExerciseDemoCard extends StatelessWidget {
                   children: [
                     Text(
                       exercise.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                         height: 1.25,
-                        color: VivrantColors.ink,
+                        color: c.ink,
                       ),
                     ),
                     if (meta.isNotEmpty) ...[
@@ -65,7 +64,7 @@ class ExerciseDemoCard extends StatelessWidget {
                       Text(
                         meta,
                         style: TextStyle(
-                          color: VivrantColors.ink.withValues(alpha: 0.62),
+                          color: c.ink.withValues(alpha: 0.62),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           height: 1.3,
@@ -81,7 +80,7 @@ class ExerciseDemoCard extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: VivrantColors.ink.withValues(alpha: 0.35),
+                color: c.ink.withValues(alpha: 0.35),
               ),
             ],
           ),
@@ -106,6 +105,7 @@ class _Thumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: SizedBox(
@@ -131,13 +131,13 @@ class _Thumb extends StatelessWidget {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: VivrantColors.panel.withValues(alpha: 0.92),
+                    color: c.panel.withValues(alpha: 0.92),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.play_arrow_rounded,
                     size: 18,
-                    color: VivrantColors.accent,
+                    color: c.accent,
                   ),
                 ),
               ),
@@ -155,11 +155,12 @@ class _Fallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return ColoredBox(
-      color: VivrantColors.accentSoft,
+      color: c.accentSoft,
       child: Icon(
         muscleIcon(muscleGroup),
-        color: VivrantColors.accent,
+        color: c.accent,
         size: 28,
       ),
     );

@@ -26,10 +26,28 @@ extension VivrantNutritionApi on VivrantApi {
     await _client.delete('/api/mobile/nutrition/meals/$id');
   }
 
-  Future<Map<String, dynamic>> estimateMealAi(String description) async {
+  Future<Map<String, dynamic>> estimateMealAi(
+    String description, {
+    String? photoPath,
+  }) async {
+    if (photoPath != null && photoPath.isNotEmpty) {
+      final name = photoPath.split(RegExp(r'[\\/]')).last;
+      final form = FormData.fromMap({
+        'description': description,
+        'photo': await MultipartFile.fromFile(photoPath, filename: name),
+      });
+      final res = await _client.postMultipart<Map<String, dynamic>>(
+        '/api/mobile/nutrition/estimate',
+        form,
+        options: ApiClient.aiOptions,
+      );
+      return Map<String, dynamic>.from(res.data ?? {});
+    }
+
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/nutrition/estimate',
       data: {'description': description},
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }

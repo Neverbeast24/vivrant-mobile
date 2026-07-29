@@ -52,6 +52,7 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     final catalog = _catalog;
     final grouped = _grouped;
     final visibleGroups = ModuleGroup.values
@@ -72,59 +73,29 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
             title: 'Everything',
             highlight: 'else',
           ),
-          TextField(
+          VivrantSearchField(
             controller: _query,
+            hintText: 'Search modules…',
             onChanged: (_) => setState(() {}),
-            textInputAction: TextInputAction.search,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: VivrantColors.ink,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Search modules…',
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                color: VivrantColors.ink.withValues(alpha: 0.45),
-              ),
-              suffixIcon: _query.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear',
-                      onPressed: () {
-                        _query.clear();
-                        setState(() {});
-                      },
-                      icon: Icon(
-                        Icons.close_rounded,
-                        color: VivrantColors.ink.withValues(alpha: 0.45),
-                      ),
-                    ),
-            ),
           ),
           const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _GroupChip(
-                  label: 'All',
-                  selected: _selectedGroup == null,
-                  onTap: () => setState(() => _selectedGroup = null),
+          VivrantFilterChips<ModuleGroup?>(
+            options: [
+              VivrantFilterOption(
+                value: null,
+                label: 'All',
+                count: catalog.length,
+              ),
+              ...filterGroups.map(
+                (group) => VivrantFilterOption(
+                  value: group,
+                  label: group.label,
+                  count: catalog.where((m) => m.group == group).length,
                 ),
-                ...filterGroups.map(
-                  (group) => Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: _GroupChip(
-                      label: group.label,
-                      selected: _selectedGroup == group,
-                      count: catalog.where((m) => m.group == group).length,
-                      onTap: () => setState(() => _selectedGroup = group),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
+            selected: _selectedGroup,
+            onSelected: (group) => setState(() => _selectedGroup = group),
           ),
           const SizedBox(height: 20),
           if (visibleGroups.isEmpty)
@@ -141,7 +112,7 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
                 trailing: Text(
                   '${grouped[group]!.length}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: VivrantColors.ink.withValues(alpha: 0.45),
+                        color: c.ink.withValues(alpha: 0.45),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -162,45 +133,6 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
             ],
         ],
       ),
-    );
-  }
-}
-
-class _GroupChip extends StatelessWidget {
-  const _GroupChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.count,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final int? count;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = count == null ? label : '$label ($count)';
-    return FilterChip(
-      label: Text(text),
-      selected: selected,
-      showCheckmark: false,
-      onSelected: (_) => onTap(),
-      selectedColor: VivrantColors.accentSoft,
-      backgroundColor: VivrantColors.panel,
-      side: BorderSide(
-        color: selected
-            ? VivrantColors.accent.withValues(alpha: 0.35)
-            : VivrantColors.ink.withValues(alpha: 0.1),
-      ),
-      labelStyle: TextStyle(
-        color: selected ? VivrantColors.accentDeep : VivrantColors.ink,
-        fontWeight: FontWeight.w700,
-        fontSize: 13,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      visualDensity: VisualDensity.compact,
     );
   }
 }

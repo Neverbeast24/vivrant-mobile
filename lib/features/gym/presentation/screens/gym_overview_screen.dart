@@ -7,6 +7,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 import '../widgets/gym_nav_card.dart';
 
 class GymOverviewScreen extends ConsumerStatefulWidget {
@@ -30,6 +31,13 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..forward();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.gymOverview);
+    if (cached != null) {
+      _data = Map<String, dynamic>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
@@ -40,13 +48,15 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
   }
 
   Future<void> _load() async {
+    final showSpinner = _data == null;
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(vivrantApiProvider).gymOverview();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymOverview, data);
       setState(() {
         _data = data;
         _loading = false;
@@ -118,7 +128,7 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
           const _GymAtmosphere(),
           RefreshIndicator(
             onRefresh: _load,
-            color: VivrantColors.accent,
+            color: accent,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
               children: [
@@ -388,6 +398,7 @@ class _StatChip extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
     final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
+    final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
 
     Color bg;
     Color fg;
@@ -408,14 +419,18 @@ class _StatChip extends StatelessWidget {
       bg = (dark ? VivrantColors.darkPanel : Colors.white)
           .withValues(alpha: 0.96);
       fg = ink;
-      iconColor = VivrantColors.accent;
+      iconColor = accent;
     }
 
     return Container(
       width: 132,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
-        gradient: featured ? VivrantColors.brandGradient : null,
+        gradient: featured
+            ? (dark
+                ? VivrantColors.darkBrandGradient
+                : VivrantColors.brandGradient)
+            : null,
         color: featured ? null : bg,
         borderRadius: BorderRadius.circular(20),
         border: featured
@@ -423,7 +438,7 @@ class _StatChip extends StatelessWidget {
             : Border.all(color: ink.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
-            color: VivrantColors.accent.withValues(
+            color: accent.withValues(
               alpha: featured ? 0.18 : 0.04,
             ),
             blurRadius: 16,
@@ -504,7 +519,8 @@ class _SoftCard extends StatelessWidget {
         border: Border.all(color: ink.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
-            color: VivrantColors.accent.withValues(alpha: dark ? 0.08 : 0.05),
+            color: (dark ? VivrantColors.darkAccent : VivrantColors.accent)
+                .withValues(alpha: dark ? 0.08 : 0.05),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),

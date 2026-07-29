@@ -163,6 +163,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/preferences',
         builder: (_, __) => const PreferencesScreen(),
       ),
+      GoRoute(
+        path: '/profile/password',
+        builder: (_, __) => const ChangePasswordScreen(),
+      ),
       GoRoute(path: '/support', builder: (_, __) => const SupportScreen()),
       GoRoute(
         path: '/notifications',
@@ -195,7 +199,14 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(this._ref) {
-    _ref.listen(authProvider, (_, __) => notifyListeners());
+    // Defer GoRouter refresh so it never runs inside StateNotifier's
+    // synchronous listener loop. A throw there becomes
+    // StateNotifierListenerError and wrongly fails an otherwise-OK login.
+    _ref.listen(authProvider, (_, __) {
+      Future.microtask(() {
+        if (hasListeners) notifyListeners();
+      });
+    });
   }
 
   final Ref _ref;

@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -22,17 +23,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.reports);
+    if (cached != null) {
+      _data = Map<String, dynamic>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
   Future<void> _load() async {
+    final showSpinner = _data == null;
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(vivrantApiProvider).reports();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.reports, data);
       setState(() {
         _data = data;
         _loading = false;

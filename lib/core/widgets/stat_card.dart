@@ -18,15 +18,16 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: VivrantColors.ink.withValues(alpha: 0.08)),
+        border: Border.all(color: c.ink.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: VivrantColors.accent.withValues(alpha: 0.06),
+            color: c.accent.withValues(alpha: c.dark ? 0.12 : 0.06),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -38,7 +39,7 @@ class StatCard extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 18, color: VivrantColors.accent),
+                Icon(icon, size: 18, color: c.accent),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -54,6 +55,7 @@ class StatCard extends StatelessWidget {
             value,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w700,
+                  color: c.ink,
                 ),
           ),
           if (caption != null) ...[

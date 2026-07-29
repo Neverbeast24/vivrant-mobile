@@ -1,0 +1,89 @@
+import 'package:flutter/material.dart';
+
+import '../theme/vivrant_colors.dart';
+
+class VivrantFilterOption<T> {
+  const VivrantFilterOption({
+    required this.value,
+    required this.label,
+    this.count,
+  });
+
+  final T value;
+  final String label;
+  final int? count;
+}
+
+/// Horizontal filter chip row used across list panels.
+class VivrantFilterChips<T> extends StatelessWidget {
+  const VivrantFilterChips({
+    super.key,
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<VivrantFilterOption<T>> options;
+  final T selected;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (options.isEmpty) return const SizedBox.shrink();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < options.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _Chip(
+              label: options[i].count == null
+                  ? options[i].label
+                  : '${options[i].label} (${options[i].count})',
+              selected: selected == options[i].value,
+              onTap: () => onSelected(options[i].value),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onTap(),
+      selectedColor: c.accentSoft,
+      backgroundColor: c.panel,
+      side: BorderSide(
+        color: selected
+            ? c.accent.withValues(alpha: 0.35)
+            : c.ink.withValues(alpha: 0.1),
+      ),
+      labelStyle: TextStyle(
+        color: selected ? c.accentDeep : c.ink,
+        fontWeight: FontWeight.w700,
+        fontSize: 13,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}

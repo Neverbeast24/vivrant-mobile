@@ -23,6 +23,7 @@ class ListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Material(
       color: Theme.of(context).cardTheme.color,
       borderRadius: BorderRadius.circular(18),
@@ -34,9 +35,7 @@ class ListRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: VivrantColors.ink.withValues(alpha: 0.08),
-            ),
+            border: Border.all(color: c.ink.withValues(alpha: 0.08)),
           ),
           child: Row(
             children: [
@@ -50,7 +49,10 @@ class ListRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: c.ink,
+                      ),
                     ),
                     if (subtitle != null)
                       Text(

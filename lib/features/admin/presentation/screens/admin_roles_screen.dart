@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class AdminRolesScreen extends ConsumerStatefulWidget {
   const AdminRolesScreen({super.key});
@@ -20,17 +21,26 @@ class _AdminRolesScreenState extends ConsumerState<AdminRolesScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.adminRoles);
+    if (cached != null) {
+      _data = cached;
+      _loading = false;
+    }
     _load();
   }
 
   Future<void> _load() async {
+    final showSpinner = _data == null;
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(vivrantApiProvider).adminRoles();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.adminRoles, data);
       setState(() {
         _data = data;
         _loading = false;

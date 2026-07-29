@@ -38,6 +38,7 @@ class ExerciseDemoSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     final thumb = exercise.demoThumbnailUrl?.trim();
     final hasThumb = thumb != null && thumb.isNotEmpty;
     final bottom = MediaQuery.paddingOf(context).bottom;
@@ -45,7 +46,7 @@ class ExerciseDemoSheet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: BoxDecoration(
-        color: VivrantColors.panel,
+        color: c.panel,
         borderRadius: BorderRadius.circular(28),
       ),
       child: SafeArea(
@@ -61,7 +62,7 @@ class ExerciseDemoSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: VivrantColors.ink.withValues(alpha: 0.12),
+                    color: c.ink.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -78,24 +79,22 @@ class ExerciseDemoSheet extends StatelessWidget {
                         CachedNetworkImage(
                           imageUrl: thumb,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) => const ColoredBox(
-                            color: VivrantColors.accentSoft,
-                          ),
+                          placeholder: (_, __) => ColoredBox(color: c.accentSoft),
                           errorWidget: (_, __, ___) => ColoredBox(
-                            color: VivrantColors.accentSoft,
+                            color: c.accentSoft,
                             child: Icon(
                               muscleIcon(exercise.muscleGroup),
-                              color: VivrantColors.accent,
+                              color: c.accent,
                               size: 40,
                             ),
                           ),
                         )
                       else
                         ColoredBox(
-                          color: VivrantColors.accentSoft,
+                          color: c.accentSoft,
                           child: Icon(
                             muscleIcon(exercise.muscleGroup),
-                            color: VivrantColors.accent,
+                            color: c.accent,
                             size: 40,
                           ),
                         ),
@@ -106,13 +105,13 @@ class ExerciseDemoSheet extends StatelessWidget {
                             width: 56,
                             height: 56,
                             decoration: BoxDecoration(
-                              color: VivrantColors.panel.withValues(alpha: 0.94),
+                              color: c.panel.withValues(alpha: 0.94),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.play_arrow_rounded,
                               size: 32,
-                              color: VivrantColors.accent,
+                              color: c.accent,
                             ),
                           ),
                         ),
@@ -123,10 +122,10 @@ class ExerciseDemoSheet extends StatelessWidget {
               const SizedBox(height: 18),
               Text(
                 exercise.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: VivrantColors.ink,
+                  color: c.ink,
                   height: 1.2,
                 ),
               ),
@@ -165,7 +164,7 @@ class ExerciseDemoSheet extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
-                    color: VivrantColors.ink.withValues(alpha: 0.7),
+                    color: c.ink.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -175,7 +174,7 @@ class ExerciseDemoSheet extends StatelessWidget {
                     fontSize: 15,
                     height: 1.45,
                     fontWeight: FontWeight.w500,
-                    color: VivrantColors.ink.withValues(alpha: 0.78),
+                    color: c.ink.withValues(alpha: 0.78),
                   ),
                 ),
               ],
@@ -207,7 +206,7 @@ class _MetaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tint = color ?? VivrantColors.accent;
+    final tint = color ?? VivrantColors.of(context).accent;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(

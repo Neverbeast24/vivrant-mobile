@@ -7,8 +7,8 @@ import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
-import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/providers/theme_provider.dart';
 
 class PreferencesScreen extends ConsumerStatefulWidget {
   const PreferencesScreen({super.key});
@@ -19,13 +19,38 @@ class PreferencesScreen extends ConsumerStatefulWidget {
 
 class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
     with SingleTickerProviderStateMixin {
-  final _steps = TextEditingController(text: '8000');
-  final _water = TextEditingController(text: '2500');
+  final _timezone = TextEditingController(text: 'Asia/Manila');
+  String _theme = 'system';
+  bool _notifications = true;
+  bool _weeklyReport = true;
   bool _loading = false;
-  bool _synced = false;
+  bool _loadingPrefs = false;
   late final AnimationController _enter;
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
+
+  static const _themeOptions = <(String, String)>[
+    ('light', 'Light'),
+    ('dark', 'Dark'),
+    ('system', 'System'),
+  ];
+
+  static const _timezoneOptions = <String>[
+    'Asia/Manila',
+    'Asia/Singapore',
+    'Asia/Tokyo',
+    'Asia/Hong_Kong',
+    'Asia/Bangkok',
+    'Asia/Jakarta',
+    'Australia/Sydney',
+    'Pacific/Auckland',
+    'Europe/London',
+    'Europe/Paris',
+    'America/New_York',
+    'America/Los_Angeles',
+    'America/Chicago',
+    'UTC',
+  ];
 
   @override
   void initState() {
@@ -39,22 +64,46 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
       begin: const Offset(0, 0.06),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
+    // Seed from local auth/theme so the form paints immediately.
+    final auth = ref.read(authProvider).profile;
+    final localTheme = themeModeToString(ref.read(themeModeProvider));
+    _theme = localTheme;
+    _timezone.text = auth?.timezone ?? 'Asia/Manila';
+    _loadingPrefs = false;
     _enter.forward();
+    _load();
   }
 
   @override
   void dispose() {
     _enter.dispose();
-    _steps.dispose();
-    _water.dispose();
+    _timezone.dispose();
     super.dispose();
   }
 
-  void _sync(Profile? profile) {
-    if (_synced || profile == null) return;
-    _steps.text = '${profile.dailyStepGoal}';
-    _water.text = '${profile.dailyWaterGoalMl}';
-    _synced = true;
+  Future<void> _load() async {
+    setState(() => _loadingPrefs = true);
+    try {
+      final settings = await ref.read(vivrantApiProvider).getPreferences();
+      if (!mounted) return;
+      setState(() {
+        _theme = (settings['theme'] as String?) ?? 'system';
+        _notifications = settings['notifications_enabled'] as bool? ?? true;
+        _weeklyReport = settings['weekly_report_enabled'] as bool? ?? true;
+        _timezone.text = (settings['timezone'] as String?) ??
+            ref.read(authProvider).profile?.timezone ??
+            'Asia/Manila';
+        _loadingPrefs = false;
+      });
+      await ref.read(themeModeProvider.notifier).setThemeFromPreference(_theme);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _timezone.text =
+            ref.read(authProvider).profile?.timezone ?? 'Asia/Manila';
+        _loadingPrefs = false;
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -62,10 +111,14 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
     setState(() => _loading = true);
     try {
       await ref.read(vivrantApiProvider).savePreferences({
-        'daily_step_goal': int.tryParse(_steps.text) ?? 8000,
-        'daily_water_goal_ml': int.tryParse(_water.text) ?? 2500,
+        'theme': _theme,
+        'notifications_enabled': _notifications,
+        'weekly_report_enabled': _weeklyReport,
+        'timezone': _timezone.text.trim().isEmpty
+            ? 'Asia/Manila'
+            : _timezone.text.trim(),
       });
-      await ref.read(authProvider.notifier).refreshProfile();
+      await ref.read(themeModeProvider.notifier).setThemeFromPreference(_theme);
       if (!mounted) return;
       context.showSuccess('Preferences saved');
     } catch (e) {
@@ -78,9 +131,6 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(authProvider).profile;
-    _sync(profile);
-
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
@@ -88,6 +138,10 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
     final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
     final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
     final soft = dark ? VivrantColors.darkAccentSoft : VivrantColors.accentSoft;
+
+    final tzValue = _timezoneOptions.contains(_timezone.text)
+        ? _timezone.text
+        : null;
 
     return GradientScaffold(
       appBar: AppBar(title: const Text('Preferences')),
@@ -100,92 +154,174 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
             children: [
               const PageHeader(
                 eyebrow: 'Settings',
-                title: 'Daily',
-                highlight: 'targets',
+                title: 'Tune your',
+                highlight: 'experience',
               ),
+              if (_loadingPrefs)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
               Text(
-                'Tune the everyday defaults that keep your rhythm steady.',
+                'Appearance, alerts, and when your day starts.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: muted,
                   height: 1.45,
                 ),
               ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-                decoration: BoxDecoration(
-                  color: panel.withValues(alpha: dark ? 0.92 : 0.96),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: ink.withValues(alpha: 0.06)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: VivrantColors.accent
-                          .withValues(alpha: dark ? 0.08 : 0.05),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+                      decoration: BoxDecoration(
+                        color: panel.withValues(alpha: dark ? 0.92 : 0.96),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: ink.withValues(alpha: 0.06)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent
+                                .withValues(alpha: dark ? 0.08 : 0.05),
+                            blurRadius: 24,
+                            offset: const Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _PrefHint(
+                            icon: Icons.palette_outlined,
+                            label: 'Appearance',
+                            soft: soft,
+                            accent: accent,
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey('theme-$_theme'),
+                            initialValue: _theme,
+                            decoration: InputDecoration(
+                              labelText: 'Theme',
+                              prefixIcon: Icon(
+                                Icons.brightness_6_outlined,
+                                size: 20,
+                                color: muted,
+                              ),
+                            ),
+                            items: _themeOptions
+                                .map(
+                                  (o) => DropdownMenuItem(
+                                    value: o.$1,
+                                    child: Text(o.$2),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setState(() => _theme = v);
+                              ref
+                                  .read(themeModeProvider.notifier)
+                                  .setThemeFromPreference(v);
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _PrefHint(
+                            icon: Icons.schedule_rounded,
+                            label: 'Timezone',
+                            soft: soft,
+                            accent: accent,
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey('tz-${tzValue ?? _timezone.text}'),
+                            initialValue: tzValue,
+                            decoration: InputDecoration(
+                              labelText: 'Timezone',
+                              prefixIcon: Icon(
+                                Icons.public_rounded,
+                                size: 20,
+                                color: muted,
+                              ),
+                            ),
+                            items: _timezoneOptions
+                                .map(
+                                  (tz) => DropdownMenuItem(
+                                    value: tz,
+                                    child: Text(tz),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setState(() => _timezone.text = v);
+                            },
+                          ),
+                          if (tzValue == null) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _timezone,
+                              decoration: InputDecoration(
+                                labelText: 'Custom IANA timezone',
+                                hintText: 'Asia/Manila',
+                                prefixIcon: Icon(
+                                  Icons.edit_outlined,
+                                  size: 20,
+                                  color: muted,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 20),
+                          _PrefHint(
+                            icon: Icons.notifications_outlined,
+                            label: 'Alerts',
+                            soft: soft,
+                            accent: accent,
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text(
+                              'Push notifications',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Text(
+                              'Alerts for tickets, broadcasts, and insights',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
+                              ),
+                            ),
+                            value: _notifications,
+                            activeThumbColor: accent,
+                            onChanged: (v) =>
+                                setState(() => _notifications = v),
+                          ),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text(
+                              'Weekly report',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Text(
+                              'Email a summary of your wellbeing trends',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
+                              ),
+                            ),
+                            value: _weeklyReport,
+                            activeThumbColor: accent,
+                            onChanged: (v) => setState(() => _weeklyReport = v),
+                          ),
+                          const SizedBox(height: 12),
+                          PrimaryButton(
+                            label: _loading ? 'Saving…' : 'Save preferences',
+                            loading: _loading,
+                            onPressed: _save,
+                            icon: Icons.check_rounded,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _PrefHint(
-                      icon: Icons.directions_walk_rounded,
-                      label: 'Movement',
-                      soft: soft,
-                      accent: accent,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _steps,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        labelText: 'Daily step goal',
-                        hintText: '8000',
-                        prefixIcon: Icon(
-                          Icons.directions_walk_rounded,
-                          size: 20,
-                          color: muted,
-                        ),
-                        suffixText: 'steps',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _PrefHint(
-                      icon: Icons.water_drop_outlined,
-                      label: 'Hydration',
-                      soft: soft,
-                      accent: accent,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _water,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: InputDecoration(
-                        labelText: 'Daily water goal',
-                        hintText: '2500',
-                        prefixIcon: Icon(
-                          Icons.water_drop_outlined,
-                          size: 20,
-                          color: muted,
-                        ),
-                        suffixText: 'ml',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    PrimaryButton(
-                      label: _loading ? 'Saving…' : 'Save preferences',
-                      loading: _loading,
-                      onPressed: _save,
-                      icon: Icons.check_rounded,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

@@ -19,4 +19,17 @@ class PantryItem {
         category: json['category'] as String? ?? 'other',
         stockLevel: (json['stock_level'] as num?)?.toInt() ?? 50,
       );
+
+  PantryItem copyWith({
+    int? id,
+    String? name,
+    String? category,
+    int? stockLevel,
+  }) =>
+      PantryItem(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        category: category ?? this.category,
+        stockLevel: stockLevel ?? this.stockLevel,
+      );
 }

@@ -7,6 +7,7 @@ import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class HealthHistoryScreen extends ConsumerStatefulWidget {
   const HealthHistoryScreen({super.key});
@@ -30,6 +31,13 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
       vsync: this,
       duration: const Duration(milliseconds: 720),
     )..forward();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<Map<String, dynamic>>>(ModuleCacheKeys.healthHistory);
+    if (cached != null) {
+      _entries = List<Map<String, dynamic>>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
@@ -40,13 +48,15 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
   }
 
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.healthHistory);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final entries = await ref.read(vivrantApiProvider).healthHistory();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.healthHistory, entries);
       setState(() {
         _entries = entries;
         _loading = false;
@@ -102,8 +112,10 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
           'title': title.text.trim(),
           if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
         });
+        if (!mounted) return;
         HapticFeedback.lightImpact();
-        _load();
+        context.showSuccess('Health history saved');
+        await _load();
       } catch (e) {
         if (!mounted) return;
         context.showError(apiErrorMessage(e));
@@ -206,7 +218,7 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
                           border: Border.all(color: ink.withValues(alpha: 0.06)),
                           boxShadow: [
                             BoxShadow(
-                              color: VivrantColors.accent
+                              color: accent
                                   .withValues(alpha: dark ? 0.07 : 0.04),
                               blurRadius: 18,
                               offset: const Offset(0, 8),

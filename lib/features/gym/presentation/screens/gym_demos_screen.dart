@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
-import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
+import '../../../../shared/providers/module_cache.dart';
 import '../gym_labels.dart';
 import '../widgets/exercise_demo_card.dart';
 import '../widgets/exercise_demo_sheet.dart';
@@ -28,6 +28,13 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<GymExercise>>(ModuleCacheKeys.gymDemos);
+    if (cached != null) {
+      _exercises = List<GymExercise>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
@@ -45,18 +52,21 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
   }
 
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.gymDemos);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final rows = await ref.read(vivrantApiProvider).gymExercises();
       if (!mounted) return;
+      final exercises = rows
+          .map(GymExercise.fromJson)
+          .where((e) => !e.isMachine)
+          .toList(growable: false);
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymDemos, exercises);
       setState(() {
-        _exercises = rows
-            .map(GymExercise.fromJson)
-            .where((e) => !e.isMachine)
-            .toList(growable: false);
+        _exercises = exercises;
         _loading = false;
       });
     } catch (e) {
@@ -126,54 +136,22 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
                         title: 'Exercise',
                         highlight: 'demos',
                       ),
-                      TextField(
+                      VivrantSearchField(
                         controller: _query,
+                        hintText: 'Search exercises…',
                         onChanged: (_) => setState(() {}),
-                        textInputAction: TextInputAction.search,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: VivrantColors.ink,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search exercises…',
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: VivrantColors.ink.withValues(alpha: 0.45),
-                          ),
-                          suffixIcon: _query.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Clear',
-                                  onPressed: () {
-                                    _query.clear();
-                                    setState(() {});
-                                  },
-                                  icon: Icon(
-                                    Icons.close_rounded,
-                                    color: VivrantColors.ink
-                                        .withValues(alpha: 0.45),
-                                  ),
-                                ),
-                        ),
                       ),
                       const SizedBox(height: 14),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (var i = 0; i < _muscleOptions.length; i++) ...[
-                              if (i > 0) const SizedBox(width: 8),
-                              _MuscleChip(
-                                label: muscleFilterLabel(_muscleOptions[i]),
-                                selected: _muscle == _muscleOptions[i],
-                                onTap: () => setState(
-                                  () => _muscle = _muscleOptions[i],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                      VivrantFilterChips<String>(
+                        options: [
+                          for (final muscle in _muscleOptions)
+                            VivrantFilterOption(
+                              value: muscle,
+                              label: muscleFilterLabel(muscle),
+                            ),
+                        ],
+                        selected: _muscle,
+                        onSelected: (v) => setState(() => _muscle = v),
                       ),
                       const SizedBox(height: 18),
                       if (_exercises.isEmpty)
@@ -201,42 +179,6 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
                     ],
                   ),
       ),
-    );
-  }
-}
-
-class _MuscleChip extends StatelessWidget {
-  const _MuscleChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      showCheckmark: false,
-      onSelected: (_) => onTap(),
-      selectedColor: VivrantColors.accentSoft,
-      backgroundColor: VivrantColors.panel,
-      side: BorderSide(
-        color: selected
-            ? VivrantColors.accent.withValues(alpha: 0.35)
-            : VivrantColors.ink.withValues(alpha: 0.1),
-      ),
-      labelStyle: TextStyle(
-        color: selected ? VivrantColors.accentDeep : VivrantColors.ink,
-        fontWeight: FontWeight.w700,
-        fontSize: 13,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      visualDensity: VisualDensity.compact,
     );
   }
 }

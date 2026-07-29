@@ -16,6 +16,7 @@ class VivrantProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     final clamped = value.clamp(0.0, 1.0);
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
@@ -23,13 +24,11 @@ class VivrantProgressBar extends StatelessWidget {
         height: height,
         child: Stack(
           children: [
-            Container(color: VivrantColors.ink.withValues(alpha: 0.08)),
+            Container(color: c.ink.withValues(alpha: 0.08)),
             FractionallySizedBox(
               widthFactor: clamped,
               child: Container(
-                decoration: const BoxDecoration(
-                  gradient: VivrantColors.brandGradient,
-                ),
+                decoration: BoxDecoration(gradient: c.brandGradient),
               ),
             ),
           ],

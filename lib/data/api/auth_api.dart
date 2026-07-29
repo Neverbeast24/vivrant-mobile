@@ -44,6 +44,19 @@ extension VivrantAuthApi on VivrantApi {
     await _client.post('/api/auth/reset-password', data: {'password': password});
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String password,
+  }) async {
+    await _client.post(
+      '/api/auth/change-password',
+      data: {
+        'currentPassword': currentPassword,
+        'password': password,
+      },
+    );
+  }
+
   Future<void> logout() async {
     try {
       await _client.post('/api/mobile/auth/logout');

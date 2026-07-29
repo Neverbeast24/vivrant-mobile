@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,8 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/env.dart';
 import '../../config/supabase_bootstrap.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/push_service.dart';
 import '../../data/vivrant_api.dart';
 import '../models/models.dart';
+import 'module_cache.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
@@ -39,21 +42,43 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._api, this._client)
-      : super(const AuthState(status: AuthStatus.unknown)) {
+  AuthNotifier(this._api, this._client, this._moduleCache)
+      : _push = PushService(_api),
+        super(const AuthState(status: AuthStatus.unknown)) {
     _client.onSessionExpired = _handleSessionExpired;
     _bootstrap();
   }
 
   final VivrantApi _api;
   final ApiClient _client;
+  final ModuleCache _moduleCache;
+  final PushService _push;
+
+  void _enqueuePushRegistration() {
+    // Fire-and-forget; never block or fail auth on push setup.
+    Future<void>(() async {
+      try {
+        await _push.registerIfAvailable();
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[vivrant:push] ignored error: $e');
+        }
+      }
+    });
+  }
 
   void _handleSessionExpired() {
     if (state.status != AuthStatus.authenticated) return;
     if (kDebugMode) {
       debugPrint('[vivrant:auth] session expired — forcing re-login');
     }
-    state = const AuthState(status: AuthStatus.unauthenticated);
+    // Defer so GoRouter redirect does not tear down overlays mid-frame
+    // (Duplicate GlobalKey / dirty build-scope crashes).
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (state.status != AuthStatus.authenticated) return;
+      _moduleCache.invalidate();
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -75,6 +100,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             .getProfile()
             .timeout(const Duration(seconds: 12));
         state = AuthState(status: AuthStatus.authenticated, profile: profile);
+        _enqueuePushRegistration();
       } catch (_) {
         await _client.clearTokens();
         state = AuthState(
@@ -97,7 +123,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[vivrant:auth] login start email=$email');
     }
     try {
-      await _api.login(email: email, password: password);
+      final data = await _api.login(email: email, password: password);
       final token = await _client.accessToken;
       if (token == null || token.isEmpty) {
         state = state.copyWith(
@@ -106,24 +132,53 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         return false;
       }
-      final profile = await _api.getProfile();
+      // Prefer profile from login response — avoids a second round-trip.
+      final profile = _profileFromAuthPayload(data) ?? await _api.getProfile();
       if (kDebugMode) {
         debugPrint(
           '[vivrant:auth] login ok user=${profile.displayName} email=${profile.email}',
         );
       }
       state = AuthState(status: AuthStatus.authenticated, profile: profile);
-      return true;
-    } catch (e) {
+    } catch (e, st) {
+      // StateNotifier applies state before notifying listeners. If a listener
+      // throws (e.g. GoRouter refresh), auth is already set — keep the session.
+      if (state.status == AuthStatus.authenticated) {
+        if (kDebugMode) {
+          debugPrint(
+            '[vivrant:auth] login ok (ignored listener error): $e\n$st',
+          );
+        }
+        _enqueuePushRegistration();
+        return true;
+      }
       final message = apiErrorMessage(e);
       if (kDebugMode) {
-        debugPrint('[vivrant:auth] login fail: $message');
+        debugPrint('[vivrant:auth] login fail: $message\n$e\n$st');
       }
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         error: message,
       );
       return false;
+    }
+    _enqueuePushRegistration();
+    return true;
+  }
+
+  Profile? _profileFromAuthPayload(Map<String, dynamic> data) {
+    final raw = data['profile'];
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final user = data['user'];
+    if (user is Map) {
+      map.putIfAbsent('email', () => user['email']);
+      map.putIfAbsent('user_id', () => user['id']);
+    }
+    try {
+      return Profile.fromJson(map);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -164,19 +219,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
           final profile = await _api.getProfile();
           state = AuthState(status: AuthStatus.authenticated, profile: profile);
+          _enqueuePushRegistration();
           if (kDebugMode) {
             debugPrint(
               '[vivrant:auth] oauth ok provider=$provider email=${profile.email}',
             );
           }
           completer.complete(true);
-        } catch (e) {
+        } catch (e, st) {
+          if (state.status == AuthStatus.authenticated) {
+            if (kDebugMode) {
+              debugPrint(
+                '[vivrant:auth] oauth ok (ignored listener error): $e\n$st',
+              );
+            }
+            _enqueuePushRegistration();
+            if (!completer.isCompleted) completer.complete(true);
+            return;
+          }
           final message = apiErrorMessage(e);
           state = state.copyWith(
             status: AuthStatus.unauthenticated,
             error: message,
           );
-          completer.complete(false);
+          if (!completer.isCompleted) completer.complete(false);
         } finally {
           await sub.cancel();
         }
@@ -198,7 +264,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       return await completer.future.timeout(
-        const Duration(minutes: 5),
+        const Duration(seconds: 90),
         onTimeout: () async {
           await sub.cancel();
           state = state.copyWith(
@@ -237,6 +303,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _api.login(email: email, password: password);
         final profile = await _api.getProfile();
         state = AuthState(status: AuthStatus.authenticated, profile: profile);
+        _enqueuePushRegistration();
       } catch (_) {
         state = const AuthState(
           status: AuthStatus.unauthenticated,
@@ -251,6 +318,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    await _push.unregister();
     await _api.logout();
     try {
       if (await ensureSupabaseInitialized()) {
@@ -259,6 +327,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       // Local API logout already cleared tokens.
     }
+    _moduleCache.invalidate();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
@@ -269,12 +338,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  Future<void> refreshProfile() async {
-    final profile = await _api.getProfile();
-    state = state.copyWith(profile: profile);
+  Future<void> refreshProfile([Profile? profile]) async {
+    final next = profile ?? await _api.getProfile();
+    state = state.copyWith(profile: next);
   }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.watch(vivrantApiProvider), ref.watch(apiClientProvider));
+  return AuthNotifier(
+    ref.watch(vivrantApiProvider),
+    ref.watch(apiClientProvider),
+    ref.watch(moduleCacheProvider),
+  );
 });

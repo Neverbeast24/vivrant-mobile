@@ -8,6 +8,7 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class GoalsScreen extends ConsumerStatefulWidget {
   const GoalsScreen({super.key});
@@ -30,6 +31,12 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
       vsync: this,
       duration: const Duration(milliseconds: 720),
     )..forward();
+    final cached =
+        ref.read(moduleCacheProvider).read<List<HealthGoal>>(ModuleCacheKeys.goals);
+    if (cached != null) {
+      _goals = List<HealthGoal>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
@@ -39,18 +46,25 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _setGoals(List<HealthGoal> goals) {
+    ref.read(moduleCacheProvider).write(ModuleCacheKeys.goals, goals);
     setState(() {
-      _loading = true;
+      _goals = goals;
+      _loading = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.goals);
+    setState(() {
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final goals = await ref.read(vivrantApiProvider).listGoals();
       if (!mounted) return;
-      setState(() {
-        _goals = goals;
-        _loading = false;
-      });
+      _setGoals(goals);
       _enter.forward(from: 0);
     } catch (e) {
       if (!mounted) return;
@@ -87,15 +101,18 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
         ],
       ),
     );
-    if (ok == true && title.text.trim().isNotEmpty && mounted) {
+    final text = title.text.trim();
+    title.dispose();
+    if (ok == true && text.isNotEmpty && mounted) {
       try {
-        await ref.read(vivrantApiProvider).addGoal({
-          'title': title.text.trim(),
-          'category': 'general',
-          'status': 'active',
+        final goal = await ref.read(vivrantApiProvider).addGoal({
+          'title': text,
+          'category': 'other',
         });
+        if (!mounted) return;
         HapticFeedback.lightImpact();
-        _load();
+        _setGoals([goal, ..._goals]);
+        context.showSuccess('Goal added');
       } catch (e) {
         if (!mounted) return;
         context.showError(apiErrorMessage(e));
@@ -121,6 +138,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
     final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
     final panel = dark ? VivrantColors.darkPanel : Colors.white;
     final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
+    final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
 
     return GradientScaffold(
       appBar: AppBar(
@@ -203,7 +221,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                           border: Border.all(color: ink.withValues(alpha: 0.06)),
                           boxShadow: [
                             BoxShadow(
-                              color: VivrantColors.accent
+                              color: accent
                                   .withValues(alpha: dark ? 0.07 : 0.04),
                               blurRadius: 18,
                               offset: const Offset(0, 8),
@@ -282,20 +300,40 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                                 color: muted,
                               ),
                               onSelected: (v) async {
+                                final prev = List<HealthGoal>.from(_goals);
                                 try {
                                   if (v == 'delete') {
+                                    _setGoals(
+                                      _goals.where((x) => x.id != g.id).toList(),
+                                    );
                                     await ref
                                         .read(vivrantApiProvider)
                                         .deleteGoal(g.id);
+                                    if (!mounted) return;
+                                    HapticFeedback.selectionClick();
+                                    context.showSuccess('Goal deleted');
                                   } else {
+                                    _setGoals([
+                                      for (final item in _goals)
+                                        if (item.id == g.id)
+                                          item.copyWith(status: v)
+                                        else
+                                          item,
+                                    ]);
                                     await ref
                                         .read(vivrantApiProvider)
                                         .updateGoalStatus(g.id, v);
+                                    if (!mounted) return;
+                                    HapticFeedback.selectionClick();
+                                    context.showSuccess(
+                                      v == 'completed'
+                                          ? 'Goal completed'
+                                          : 'Goal marked active',
+                                    );
                                   }
-                                  HapticFeedback.selectionClick();
-                                  _load();
                                 } catch (e) {
                                   if (!mounted) return;
+                                  _setGoals(prev);
                                   context.showError(apiErrorMessage(e));
                                 }
                               },

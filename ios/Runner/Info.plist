@@ -45,6 +45,12 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>VIVRΛNT needs photo access so you can set your profile avatar and log meals from pictures.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>VIVRΛNT needs camera access so you can take a profile photo or snap meal photos.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>VIVRΛNT may save images you capture for your health profile.</string>
 		<key>UIStatusBarHidden</key>
 		<false/>
 		<key>NSAppTransportSecurity</key>

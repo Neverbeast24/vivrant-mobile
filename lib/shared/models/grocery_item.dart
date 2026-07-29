@@ -23,4 +23,21 @@ class GroceryItem {
         isChecked: json['is_checked'] as bool? ?? false,
         estimatedPrice: (json['estimated_price'] as num?)?.toDouble(),
       );
+
+  GroceryItem copyWith({
+    int? id,
+    String? name,
+    String? quantity,
+    String? category,
+    bool? isChecked,
+    double? estimatedPrice,
+  }) =>
+      GroceryItem(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        quantity: quantity ?? this.quantity,
+        category: category ?? this.category,
+        isChecked: isChecked ?? this.isChecked,
+        estimatedPrice: estimatedPrice ?? this.estimatedPrice,
+      );
 }

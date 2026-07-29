@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class AdminInquiriesScreen extends ConsumerStatefulWidget {
   const AdminInquiriesScreen({super.key});
@@ -15,24 +16,74 @@ class AdminInquiriesScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminInquiriesScreenState extends ConsumerState<AdminInquiriesScreen> {
+  final _query = TextEditingController();
   List<Map<String, dynamic>> _inquiries = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<Map<String, dynamic>>>(ModuleCacheKeys.adminInquiries);
+    if (cached != null) {
+      _inquiries = cached
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      _loading = false;
+    }
     _load();
   }
 
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  static String _titleCase(String value) {
+    if (value.isEmpty) return value;
+    return value
+        .split(RegExp(r'[_\s]+'))
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
+  List<String> get _statuses {
+    final values = _inquiries
+        .map((i) => i['status']?.toString() ?? 'open')
+        .toSet()
+        .toList()
+      ..sort();
+    return values;
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _inquiries.where((row) {
+      final status = row['status']?.toString() ?? 'open';
+      if (_filter != 'all' && status != _filter) return false;
+      if (q.isEmpty) return true;
+      return (row['name']?.toString().toLowerCase() ?? '').contains(q) ||
+          (row['email']?.toString().toLowerCase() ?? '').contains(q) ||
+          (row['message']?.toString().toLowerCase() ?? '').contains(q) ||
+          (row['plan']?.toString().toLowerCase() ?? '').contains(q) ||
+          status.toLowerCase().contains(q);
+    }).toList();
+  }
+
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.adminInquiries);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final inquiries = await ref.read(vivrantApiProvider).adminInquiries();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.adminInquiries, inquiries);
       setState(() {
         _inquiries = inquiries;
         _loading = false;
@@ -146,40 +197,76 @@ class _AdminInquiriesScreenState extends ConsumerState<AdminInquiriesScreen> {
               const LoadingView()
             else if (_inquiries.isEmpty)
               const EmptyState(message: 'No inquiries yet.')
-            else
-              ..._inquiries.map(
-                (row) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: VivrantPanel(
-                    child: InkWell(
-                      onTap: () => _edit(row),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            row['name']?.toString() ?? 'Inquiry',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${row['email'] ?? '—'} · ${row['plan'] ?? 'general'} · '
-                            '${row['status'] ?? 'open'}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          if (row['message'] != null) ...[
-                            const SizedBox(height: 8),
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search inquiries…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _inquiries.length,
+                  ),
+                  ..._statuses.map(
+                    (s) => VivrantFilterOption(
+                      value: s,
+                      label: _titleCase(s),
+                      count: _inquiries
+                          .where(
+                            (i) => (i['status']?.toString() ?? 'open') == s,
+                          )
+                          .length,
+                    ),
+                  ),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (_filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No inquiries match these filters. Try All or another search.',
+                )
+              else
+                ..._filtered.map(
+                  (row) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: VivrantPanel(
+                      child: InkWell(
+                        onTap: () => _edit(row),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              row['message'].toString(),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                              row['name']?.toString() ?? 'Inquiry',
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${row['email'] ?? '—'} · ${row['plan'] ?? 'general'} · '
+                              '${row['status'] ?? 'open'}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            if (row['message'] != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                row['message'].toString(),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+            ],
           ],
         ),
       ),

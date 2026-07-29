@@ -7,6 +7,7 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class SpendingScreen extends ConsumerStatefulWidget {
   const SpendingScreen({super.key});
@@ -16,27 +17,62 @@ class SpendingScreen extends ConsumerStatefulWidget {
 }
 
 class _SpendingScreenState extends ConsumerState<SpendingScreen> {
+  final _query = TextEditingController();
   Map<String, dynamic>? _overview;
   List<Expense> _expenses = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.spending);
+    if (cached != null) {
+      _overview = cached['overview'] as Map<String, dynamic>?;
+      final expenses = cached['expenses'];
+      if (expenses is List<Expense>) {
+        _expenses = List<Expense>.from(expenses);
+      }
+      _loading = false;
+    }
     _load();
   }
 
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  void _cache() {
+    ref.read(moduleCacheProvider).write(ModuleCacheKeys.spending, {
+      'overview': _overview,
+      'expenses': _expenses,
+    });
+  }
+
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.spending);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final api = ref.read(vivrantApiProvider);
-      final overview = await api.spendingOverview();
-      final expenses = await api.listExpenses();
+      final results = await Future.wait([
+        api.spendingOverview(),
+        api.listExpenses(),
+      ]);
       if (!mounted) return;
+      final overview = results[0] as Map<String, dynamic>;
+      final expenses = results[1] as List<Expense>;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.spending, {
+        'overview': overview,
+        'expenses': expenses,
+      });
       setState(() {
         _overview = overview;
         _expenses = expenses;
@@ -51,11 +87,36 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     }
   }
 
+  List<String> get _categories {
+    final cats = _expenses.map((e) => e.category).where((c) => c.isNotEmpty).toSet().toList()
+      ..sort();
+    return cats;
+  }
+
+  List<Expense> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _expenses.where((e) {
+      if (_filter != 'all' && e.category != _filter) return false;
+      if (q.isEmpty) return true;
+      return e.title.toLowerCase().contains(q) ||
+          e.category.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  static String _titleCase(String value) {
+    if (value.isEmpty) return value;
+    return value
+        .split(RegExp(r'[_\s]+'))
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final spent = (_overview?['spent'] as num?)?.toDouble() ??
         _expenses.fold<double>(0, (s, e) => s + e.amount);
     final budget = (_overview?['budget'] as num?)?.toDouble();
+    final filtered = _filtered;
     return GradientScaffold(
       appBar: AppBar(
         title: const Text('Spending'),
@@ -125,49 +186,90 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
                   child: const Text('Log expense'),
                 ),
               )
-            else
-              ..._expenses.map(
-                (e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: VivrantPanel(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                e.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search expenses…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _expenses.length,
+                  ),
+                  ..._categories.map(
+                    (c) => VivrantFilterOption(
+                      value: c,
+                      label: _titleCase(c),
+                      count: _expenses.where((e) => e.category == c).length,
+                    ),
+                  ),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No expenses match these filters. Try All or another search.',
+                )
+              else
+                ...filtered.map(
+                  (e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: VivrantPanel(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  e.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                '${e.category} · ₱${e.amount.toStringAsFixed(0)}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+                                Text(
+                                  '${e.category} · ₱${e.amount.toStringAsFixed(0)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            try {
-                              await ref
-                                  .read(vivrantApiProvider)
-                                  .deleteExpense(e.id);
-                              _load();
-                            } catch (err) {
-                              if (!mounted) return;
-                              context.showError(apiErrorMessage(err));
-                            }
-                          },
-                        ),
-                      ],
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () async {
+                              final prev = List<Expense>.from(_expenses);
+                              setState(() {
+                                _expenses =
+                                    _expenses.where((x) => x.id != e.id).toList();
+                              });
+                              _cache();
+                              try {
+                                await ref
+                                    .read(vivrantApiProvider)
+                                    .deleteExpense(e.id);
+                                if (!mounted) return;
+                                context.showSuccess('Expense removed');
+                              } catch (err) {
+                                if (!mounted) return;
+                                setState(() => _expenses = prev);
+                                _cache();
+                                context.showError(apiErrorMessage(err));
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+            ],
           ],
         ),
       ),

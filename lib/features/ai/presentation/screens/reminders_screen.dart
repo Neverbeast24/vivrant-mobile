@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class RemindersScreen extends ConsumerStatefulWidget {
   const RemindersScreen({super.key});
@@ -14,28 +15,50 @@ class RemindersScreen extends ConsumerStatefulWidget {
 }
 
 class _RemindersScreenState extends ConsumerState<RemindersScreen> {
+  final _query = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<Map<String, dynamic>>>(ModuleCacheKeys.reminders);
+    if (cached != null) {
+      _items = List<Map<String, dynamic>>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  void _setItems(List<Map<String, dynamic>> items) {
+    ref.read(moduleCacheProvider).write(ModuleCacheKeys.reminders, items);
     setState(() {
-      _loading = true;
+      _items = items;
+      _loading = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.reminders);
+    setState(() {
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final items = await ref.read(vivrantApiProvider).listReminders();
       if (!mounted) return;
-      setState(() {
-        _items = items;
-        _loading = false;
-      });
+      _setItems(items);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -67,13 +90,20 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
         ],
       ),
     );
-    if (ok == true && title.text.trim().isNotEmpty && mounted) {
+    final text = title.text.trim();
+    title.dispose();
+    if (ok == true && text.isNotEmpty && mounted) {
       try {
-        await ref.read(vivrantApiProvider).createReminder({
-          'title': title.text.trim(),
+        final reminder = await ref.read(vivrantApiProvider).createReminder({
+          'title': text,
+          'body': text,
+          'schedule_time': '09:00',
+          'days_of_week': const [1, 2, 3, 4, 5, 6, 7],
           'enabled': true,
         });
-        _load();
+        if (!mounted) return;
+        _setItems([reminder, ..._items]);
+        context.showSuccess('Reminder created');
       } catch (e) {
         if (!mounted) return;
         context.showError(apiErrorMessage(e));
@@ -81,8 +111,21 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     }
   }
 
+  List<Map<String, dynamic>> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _items.where((r) {
+      final enabled = r['enabled'] as bool? ?? true;
+      if (_filter == 'on' && !enabled) return false;
+      if (_filter == 'off' && enabled) return false;
+      if (q.isEmpty) return true;
+      return (r['title']?.toString().toLowerCase() ?? '').contains(q);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
+    final onCount = _items.where((r) => r['enabled'] as bool? ?? true).length;
     return GradientScaffold(
       appBar: AppBar(
         title: const Text('Reminders'),
@@ -92,93 +135,144 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       ),
       child: RefreshIndicator(
         onRefresh: _load,
-        child: _loading
-            ? ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: CircularProgressIndicator()),
-                ],
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const PageHeader(
+              eyebrow: 'AI',
+              title: 'Smart',
+              highlight: 'reminders',
+            ),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Center(child: CircularProgressIndicator()),
               )
-            : _error != null
-                ? ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      EmptyState(
-                        message: _error!,
-                        action: OutlinedButton(
-                          onPressed: _load,
-                          child: const Text('Retry'),
-                        ),
-                      ),
-                    ],
-                  )
-                : _items.isEmpty
-                    ? ListView(
-                        padding: const EdgeInsets.all(20),
+            else if (_error != null)
+              EmptyState(
+                message: _error!,
+                action: OutlinedButton(
+                  onPressed: _load,
+                  child: const Text('Retry'),
+                ),
+              )
+            else if (_items.isEmpty)
+              EmptyState(
+                message: 'No reminders yet.',
+                action: ElevatedButton(
+                  onPressed: _add,
+                  child: const Text('Add reminder'),
+                ),
+              )
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search reminders…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _items.length,
+                  ),
+                  VivrantFilterOption(
+                    value: 'on',
+                    label: 'Enabled',
+                    count: onCount,
+                  ),
+                  VivrantFilterOption(
+                    value: 'off',
+                    label: 'Disabled',
+                    count: _items.length - onCount,
+                  ),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No reminders match these filters. Try All or another search.',
+                )
+              else
+                ...filtered.map((r) {
+                  final enabled = r['enabled'] as bool? ?? true;
+                  final id = (r['id'] as num).toInt();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: VivrantPanel(
+                      child: Row(
                         children: [
-                          EmptyState(
-                            message: 'No reminders yet.',
-                            action: ElevatedButton(
-                              onPressed: _add,
-                              child: const Text('Add reminder'),
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: _items.length,
-                        itemBuilder: (_, i) {
-                          final r = _items[i];
-                          final enabled = r['enabled'] as bool? ?? true;
-                          final id = (r['id'] as num).toInt();
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: VivrantPanel(
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      r['title']?.toString() ?? 'Reminder',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                  Switch(
-                                    value: enabled,
-                                    onChanged: (v) async {
-                                      try {
-                                        await ref
-                                            .read(vivrantApiProvider)
-                                            .toggleReminder(id, v);
-                                        _load();
-                                      } catch (e) {
-                                        if (!mounted) return;
-                                        context.showError(apiErrorMessage(e));
-                                      }
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline),
-                                    onPressed: () async {
-                                      try {
-                                        await ref
-                                            .read(vivrantApiProvider)
-                                            .deleteReminder(id);
-                                        _load();
-                                      } catch (e) {
-                                        if (!mounted) return;
-                                        context.showError(apiErrorMessage(e));
-                                      }
-                                    },
-                                  ),
-                                ],
+                          Expanded(
+                            child: Text(
+                              r['title']?.toString() ?? 'Reminder',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                          Switch(
+                            value: enabled,
+                            onChanged: (v) async {
+                              final prev =
+                                  _items.map((e) => Map<String, dynamic>.from(e)).toList();
+                              _setItems([
+                                for (final item in _items)
+                                  if ((item['id'] as num).toInt() == id)
+                                    {...item, 'enabled': v}
+                                  else
+                                    item,
+                              ]);
+                              try {
+                                await ref
+                                    .read(vivrantApiProvider)
+                                    .toggleReminder(id, v);
+                                if (!mounted) return;
+                                context.showSuccess(
+                                  v ? 'Reminder enabled' : 'Reminder disabled',
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                _setItems(prev);
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () async {
+                              final prev =
+                                  _items.map((e) => Map<String, dynamic>.from(e)).toList();
+                              _setItems(
+                                _items
+                                    .where((item) => (item['id'] as num).toInt() != id)
+                                    .toList(),
+                              );
+                              try {
+                                await ref
+                                    .read(vivrantApiProvider)
+                                    .deleteReminder(id);
+                                if (!mounted) return;
+                                context.showSuccess('Reminder removed');
+                              } catch (e) {
+                                if (!mounted) return;
+                                _setItems(prev);
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                        ],
                       ),
+                    ),
+                  );
+                }),
+            ],
+          ],
+        ),
       ),
     );
   }

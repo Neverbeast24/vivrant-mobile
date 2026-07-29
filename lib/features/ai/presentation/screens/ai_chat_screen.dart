@@ -7,6 +7,8 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
+import '../../../../shared/providers/module_cache.dart';
+import '../../../../shared/providers/shell_tab_provider.dart';
 import '../widgets/chat_bubble.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
@@ -17,16 +19,26 @@ class AiChatScreen extends ConsumerStatefulWidget {
 }
 
 class _AiChatScreenState extends ConsumerState<AiChatScreen> {
+  static const _tabIndex = 3;
+
   List<AiChatMessage> _messages = [];
   final _input = TextEditingController();
-  bool _loading = true;
+  bool _loading = false;
+  bool _activated = false;
   bool _sending = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<AiChatMessage>>(ModuleCacheKeys.aiChat);
+    if (cached != null) {
+      _messages = List<AiChatMessage>.from(cached);
+      _loading = false;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeActivate());
   }
 
   @override
@@ -35,14 +47,23 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     super.dispose();
   }
 
+  void _maybeActivate() {
+    if (!mounted || _activated) return;
+    if (ref.read(shellTabIndexProvider) != _tabIndex) return;
+    _activated = true;
+    _load();
+  }
+
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.aiChat);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final messages = await ref.read(vivrantApiProvider).chatHistory();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.aiChat, messages);
       setState(() {
         _messages = messages;
         _loading = false;
@@ -64,13 +85,13 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     try {
       final reply = await ref.read(vivrantApiProvider).askAi(q);
       if (!mounted) return;
-      setState(() {
-        _messages = [
-          ..._messages,
-          AiChatMessage(id: -1, role: 'user', content: q),
-          reply,
-        ];
-      });
+      final updated = [
+        ..._messages,
+        AiChatMessage(id: -1, role: 'user', content: q),
+        reply,
+      ];
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.aiChat, updated);
+      setState(() => _messages = updated);
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));
@@ -81,6 +102,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(shellTabIndexProvider, (_, next) {
+      if (next == _tabIndex) _maybeActivate();
+    });
     return SafeArea(
       child: Column(
         children: [
@@ -106,7 +130,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             ),
           ),
           Expanded(
-            child: _loading
+            child: !_activated || _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
                     ? Padding(

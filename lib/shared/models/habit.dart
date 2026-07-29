@@ -14,4 +14,15 @@ class Habit {
         title: json['title'] as String? ?? '',
         doneToday: json['done_today'] as bool? ?? false,
       );
+
+  Habit copyWith({
+    int? id,
+    String? title,
+    bool? doneToday,
+  }) =>
+      Habit(
+        id: id ?? this.id,
+        title: title ?? this.title,
+        doneToday: doneToday ?? this.doneToday,
+      );
 }

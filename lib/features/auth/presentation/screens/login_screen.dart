@@ -24,6 +24,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final _passwordFocus = FocusNode();
   bool _loading = false;
   bool _obscure = true;
+  String? _formError;
   late final AnimationController _enter;
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
@@ -54,17 +55,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _submit() async {
-    setState(() => _loading = true);
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _formError = null;
+    });
     final ok = await ref.read(authProvider.notifier).login(
           _email.text.trim(),
           _password.text,
         );
     if (!mounted) return;
-    setState(() => _loading = false);
-    if (!ok) {
-      final err = ref.read(authProvider).error;
-      context.showError(err ?? 'Sign in failed');
+    if (ok) {
+      setState(() => _loading = false);
+      return;
     }
+    final err = ref.read(authProvider).error ?? 'Sign in failed';
+    setState(() {
+      _loading = false;
+      _formError = err;
+    });
+    context.showError(err);
   }
 
   @override
@@ -116,7 +126,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               fontStyle: FontStyle.italic,
                               height: 1.05,
                               foreground: Paint()
-                                ..shader = VivrantColors.brandGradient
+                                ..shader = (dark
+                                        ? VivrantColors.darkBrandGradient
+                                        : VivrantColors.brandGradient)
                                     .createShader(
                                   const Rect.fromLTWH(0, 0, 220, 48),
                                 ),
@@ -138,7 +150,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     Material(
                       color: panel.withValues(alpha: dark ? 0.92 : 0.94),
                       elevation: 0,
-                      shadowColor: VivrantColors.accent.withValues(alpha: 0.12),
+                      shadowColor: accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(22),
                       clipBehavior: Clip.antiAlias,
                       child: DecoratedBox(
@@ -150,7 +162,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           boxShadow: [
                             BoxShadow(
                               color:
-                                  VivrantColors.accent.withValues(alpha: 0.05),
+                                  accent.withValues(alpha: 0.05),
                               blurRadius: 24,
                               offset: const Offset(0, 12),
                             ),
@@ -235,7 +247,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     child: const Text('Forgot password?'),
                                   ),
                                 ),
-                                const SizedBox(height: 12),
+                                if (_formError != null) ...[
+                                  const SizedBox(height: 4),
+                                  _LoginErrorBanner(message: _formError!),
+                                  const SizedBox(height: 12),
+                                ] else
+                                  const SizedBox(height: 12),
                                 PrimaryButton(
                                   label: 'Sign in',
                                   loading: _loading,
@@ -305,6 +322,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ),
                   ],
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginErrorBanner extends StatelessWidget {
+  const _LoginErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final accent = dark ? const Color(0xFFF97066) : const Color(0xFFB42318);
+    final bg = dark ? const Color(0xFF2A1515) : const Color(0xFFFFF1F0);
+    final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 18, color: accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 13,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+                color: ink,
               ),
             ),
           ),

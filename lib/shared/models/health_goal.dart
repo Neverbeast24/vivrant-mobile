@@ -29,4 +29,25 @@ class HealthGoal {
         targetDate: json['target_date'] as String?,
         status: json['status'] as String? ?? 'active',
       );
+
+  HealthGoal copyWith({
+    int? id,
+    String? title,
+    String? category,
+    double? targetValue,
+    double? currentValue,
+    String? unit,
+    String? targetDate,
+    String? status,
+  }) =>
+      HealthGoal(
+        id: id ?? this.id,
+        title: title ?? this.title,
+        category: category ?? this.category,
+        targetValue: targetValue ?? this.targetValue,
+        currentValue: currentValue ?? this.currentValue,
+        unit: unit ?? this.unit,
+        targetDate: targetDate ?? this.targetDate,
+        status: status ?? this.status,
+      );
 }

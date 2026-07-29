@@ -67,8 +67,14 @@ extension VivrantWellnessApi on VivrantApi {
         .toList();
   }
 
-  Future<void> addHabit(String title) async {
-    await _client.post('/api/mobile/habits', data: {'title': title});
+  Future<Habit> addHabit(String title) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/habits',
+      data: {'title': title},
+    );
+    return Habit.fromJson(
+      Map<String, dynamic>.from(res.data?['habit'] ?? res.data ?? {}),
+    );
   }
 
   Future<void> toggleHabit(int id, bool done) async {
@@ -88,7 +94,13 @@ extension VivrantWellnessApi on VivrantApi {
         .toList();
   }
 
-  Future<void> createChallenge(Map<String, dynamic> body) async {
-    await _client.post('/api/mobile/habits/challenges', data: body);
+  Future<Map<String, dynamic>> createChallenge(Map<String, dynamic> body) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/habits/challenges',
+      data: body,
+    );
+    return Map<String, dynamic>.from(
+      res.data?['challenge'] as Map? ?? res.data ?? {},
+    );
   }
 }

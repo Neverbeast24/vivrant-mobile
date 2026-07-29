@@ -48,30 +48,51 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) async {
-          // Only clear the token that actually failed — never wipe a newer
-          // session saved by a concurrent login (bootstrap 401 race).
-          if (error.response?.statusCode == 401) {
-            final path = error.requestOptions.path;
-            final isCredentialAttempt = path.contains('/api/auth/login') ||
-                path.contains('/api/auth/signup');
-            if (!isCredentialAttempt) {
-              final header =
-                  error.requestOptions.headers['Authorization']?.toString();
-              if (header != null &&
-                  header.toLowerCase().startsWith('bearer ')) {
-                final used = header.substring(7).trim();
-                if (used.isNotEmpty) {
-                  final cleared =
-                      await clearTokens(onlyIfAccessToken: used);
-                  if (cleared) {
-                    onSessionExpired?.call();
-                  }
-                }
-              } else {
-                // No bearer was sent — session is already gone.
-                onSessionExpired?.call();
+          if (error.response?.statusCode != 401) {
+            return handler.next(error);
+          }
+
+          final path = error.requestOptions.path;
+          final isAuthEndpoint = path.contains('/api/auth/login') ||
+              path.contains('/api/auth/signup') ||
+              path.contains('/api/mobile/auth/refresh');
+          if (isAuthEndpoint) {
+            return handler.next(error);
+          }
+
+          final alreadyRetried =
+              error.requestOptions.extra['_vivrantRetried'] == true;
+          if (!alreadyRetried) {
+            final refreshed = await _refreshSession();
+            if (refreshed) {
+              final opts = error.requestOptions;
+              opts.extra['_vivrantRetried'] = true;
+              final token = await _resolveAccessToken();
+              if (token != null && token.isNotEmpty) {
+                opts.headers['Authorization'] = 'Bearer $token';
+              }
+              try {
+                final response = await _dio.fetch(opts);
+                return handler.resolve(response);
+              } on DioException catch (retryError) {
+                // Retry went through interceptors; 401 expiry already handled.
+                return handler.next(retryError);
               }
             }
+          }
+
+          // Refresh failed or retry still 401 — clear only the token that
+          // failed (never wipe a newer session from a concurrent login).
+          final header =
+              error.requestOptions.headers['Authorization']?.toString();
+          if (header != null && header.toLowerCase().startsWith('bearer ')) {
+            final used = header.substring(7).trim();
+            if (used.isNotEmpty) {
+              final cleared = await clearTokens(onlyIfAccessToken: used);
+              if (cleared) onSessionExpired?.call();
+            }
+          } else {
+            onSessionExpired?.call();
           }
           handler.next(error);
         },
@@ -117,6 +138,9 @@ class ApiClient {
   String? _memoryAccessToken;
   String? _memoryRefreshToken;
 
+  /// Shared in-flight refresh so concurrent 401s only hit the endpoint once.
+  Future<bool>? _refreshInFlight;
+
   /// Called when a protected request gets 401 and the session was cleared.
   void Function()? onSessionExpired;
 
@@ -131,6 +155,75 @@ class ApiClient {
       _memoryAccessToken = stored;
     }
     return stored;
+  }
+
+  Future<String?> _resolveRefreshToken() async {
+    if (_memoryRefreshToken != null && _memoryRefreshToken!.isNotEmpty) {
+      return _memoryRefreshToken;
+    }
+    final stored = await _storage.read(key: _refreshKey);
+    if (stored != null && stored.isNotEmpty) {
+      _memoryRefreshToken = stored;
+    }
+    return stored;
+  }
+
+  /// Exchange the stored refresh token for a new access token.
+  /// Returns true when new tokens were saved.
+  Future<bool> _refreshSession() {
+    return _refreshInFlight ??= _doRefresh().whenComplete(() {
+      _refreshInFlight = null;
+    });
+  }
+
+  Future<bool> _doRefresh() async {
+    final refresh = await _resolveRefreshToken();
+    if (refresh == null || refresh.isEmpty) {
+      if (kDebugMode) {
+        debugPrint('[vivrant:api] refresh skipped — no refresh token');
+      }
+      return false;
+    }
+
+    try {
+      // Bare client avoids this interceptor (no 401 → refresh loop).
+      final bare = Dio(
+        BaseOptions(
+          baseUrl: Env.apiBaseUrl,
+          connectTimeout: const Duration(seconds: 12),
+          receiveTimeout: const Duration(seconds: 20),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
+      final res = await bare.post<Map<String, dynamic>>(
+        '/api/mobile/auth/refresh',
+        data: {'refresh_token': refresh},
+      );
+      final data = res.data;
+      final access = data?['access_token'] as String?;
+      if (access == null || access.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('[vivrant:api] refresh response missing access_token');
+        }
+        return false;
+      }
+      await saveTokens(
+        accessToken: access,
+        refreshToken: data?['refresh_token'] as String?,
+      );
+      if (kDebugMode) {
+        debugPrint('[vivrant:api] session refreshed');
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[vivrant:api] refresh failed: $e');
+      }
+      return false;
+    }
   }
 
   Future<void> saveTokens({
@@ -173,20 +266,42 @@ class ApiClient {
   Future<Response<T>> get<T>(
     String path, {
     Map<String, dynamic>? query,
+    Options? options,
   }) =>
-      _dio.get<T>(path, queryParameters: query);
+      _dio.get<T>(path, queryParameters: query, options: options);
 
-  Future<Response<T>> post<T>(String path, {Object? data}) =>
-      _dio.post<T>(path, data: data);
+  Future<Response<T>> post<T>(String path, {Object? data, Options? options}) =>
+      _dio.post<T>(path, data: data, options: options);
 
-  Future<Response<T>> patch<T>(String path, {Object? data}) =>
-      _dio.patch<T>(path, data: data);
+  Future<Response<T>> patch<T>(String path, {Object? data, Options? options}) =>
+      _dio.patch<T>(path, data: data, options: options);
 
-  Future<Response<T>> put<T>(String path, {Object? data}) =>
-      _dio.put<T>(path, data: data);
+  Future<Response<T>> put<T>(String path, {Object? data, Options? options}) =>
+      _dio.put<T>(path, data: data, options: options);
 
-  Future<Response<T>> delete<T>(String path, {Object? data}) =>
-      _dio.delete<T>(path, data: data);
+  Future<Response<T>> delete<T>(String path, {Object? data, Options? options}) =>
+      _dio.delete<T>(path, data: data, options: options);
+
+  /// Multipart upload — clears the default JSON content-type so Dio can set
+  /// the multipart boundary correctly.
+  Future<Response<T>> postMultipart<T>(
+    String path,
+    FormData data, {
+    Options? options,
+  }) =>
+      _dio.post<T>(
+        path,
+        data: data,
+        options: (options ?? Options()).copyWith(
+          contentType: 'multipart/form-data',
+        ),
+      );
+
+  /// Longer receive window for Gemini-backed endpoints.
+  static Options get aiOptions => Options(
+        receiveTimeout: const Duration(seconds: 90),
+        sendTimeout: const Duration(seconds: 60),
+      );
 }
 
 String apiErrorMessage(Object error) {

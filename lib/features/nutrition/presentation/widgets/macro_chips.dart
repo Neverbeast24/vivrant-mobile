@@ -17,28 +17,29 @@ class MacroChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     final chips = <Widget>[
-      if (proteinG != null) _chip('P ${proteinG!.toStringAsFixed(0)}g'),
-      if (carbsG != null) _chip('C ${carbsG!.toStringAsFixed(0)}g'),
-      if (fatG != null) _chip('F ${fatG!.toStringAsFixed(0)}g'),
+      if (proteinG != null) _chip(c, 'P ${proteinG!.toStringAsFixed(0)}g'),
+      if (carbsG != null) _chip(c, 'C ${carbsG!.toStringAsFixed(0)}g'),
+      if (fatG != null) _chip(c, 'F ${fatG!.toStringAsFixed(0)}g'),
     ];
     if (chips.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 6, runSpacing: 6, children: chips);
   }
 
-  Widget _chip(String label) {
+  Widget _chip(VivrantPalette c, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: VivrantColors.accentSoft,
+        color: c.accentSoft,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: VivrantColors.accent,
+          color: c.accent,
         ),
       ),
     );

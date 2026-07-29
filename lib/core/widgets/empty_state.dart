@@ -14,13 +14,14 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: VivrantColors.ink.withValues(alpha: 0.12),
+          color: c.ink.withValues(alpha: 0.12),
           style: BorderStyle.solid,
         ),
       ),

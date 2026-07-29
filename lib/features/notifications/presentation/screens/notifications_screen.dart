@@ -9,6 +9,7 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -19,24 +20,52 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  final _query = TextEditingController();
   List<AppNotification> _items = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<AppNotification>>(ModuleCacheKeys.notifications);
+    if (cached != null) {
+      _items = List<AppNotification>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  List<AppNotification> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _items.where((n) {
+      if (_filter == 'unread' && n.isRead) return false;
+      if (_filter == 'read' && !n.isRead) return false;
+      if (q.isEmpty) return true;
+      return n.title.toLowerCase().contains(q) ||
+          (n.body?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.notifications);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final items = await ref.read(vivrantApiProvider).listNotifications();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.notifications, items);
       setState(() {
         _items = items;
         _loading = false;
@@ -54,8 +83,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       await ref.read(vivrantApiProvider).markAllNotificationsRead();
       if (!mounted) return;
+      setState(() {
+        _items = [
+          for (final n in _items)
+            AppNotification(
+              id: n.id,
+              title: n.title,
+              body: n.body,
+              createdAt: n.createdAt,
+              isRead: true,
+              href: n.href,
+            ),
+        ];
+      });
+      ref
+          .read(moduleCacheProvider)
+          .write(ModuleCacheKeys.notifications, _items);
       context.showSuccess('All notifications marked as read');
-      _load();
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));
@@ -66,7 +110,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (n.isRead) return;
     try {
       await ref.read(vivrantApiProvider).markNotificationRead(n.id);
-      _load();
+      if (!mounted) return;
+      setState(() {
+        _items = [
+          for (final item in _items)
+            if (item.id == n.id)
+              AppNotification(
+                id: item.id,
+                title: item.title,
+                body: item.body,
+                createdAt: item.createdAt,
+                isRead: true,
+                href: item.href,
+              )
+            else
+              item,
+        ];
+      });
+      ref
+          .read(moduleCacheProvider)
+          .write(ModuleCacheKeys.notifications, _items);
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));
@@ -77,6 +140,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final unread = _items.where((n) => !n.isRead).length;
+    final filtered = _filtered;
     final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
     final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
 
@@ -138,19 +202,54 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   child: const Text('Refresh'),
                 ),
               )
-            else
-              ..._items.map(
-                (n) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _NotificationCard(
-                    notification: n,
-                    ink: ink,
-                    muted: muted,
-                    dark: dark,
-                    onTap: () => _markRead(n),
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search notifications…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _items.length,
+                  ),
+                  VivrantFilterOption(
+                    value: 'unread',
+                    label: 'Unread',
+                    count: unread,
+                  ),
+                  VivrantFilterOption(
+                    value: 'read',
+                    label: 'Read',
+                    count: _items.length - unread,
+                  ),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No notifications match these filters. Try All or another search.',
+                )
+              else
+                ...filtered.map(
+                  (n) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _NotificationCard(
+                      notification: n,
+                      ink: ink,
+                      muted: muted,
+                      dark: dark,
+                      onTap: () => _markRead(n),
+                    ),
                   ),
                 ),
-              ),
+            ],
           ],
         ),
       ),

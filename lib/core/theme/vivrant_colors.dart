@@ -48,6 +48,12 @@ abstract final class VivrantColors {
     colors: [accentDeep, accent, cyan],
   );
 
+  static const LinearGradient darkBrandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [darkAccentDeep, darkAccent, darkCyan],
+  );
+
   static const LinearGradient bodyGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
@@ -58,5 +64,82 @@ abstract final class VivrantColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [darkBody0, darkBody1],
+  );
+
+  /// Theme-aware tokens for the current [BuildContext] brightness.
+  static VivrantPalette of(BuildContext context) =>
+      forBrightness(Theme.of(context).brightness);
+
+  static VivrantPalette forBrightness(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? VivrantPalette.darkMode
+          : VivrantPalette.light;
+}
+
+/// Resolved light/dark color set — prefer [VivrantColors.of] in widgets.
+class VivrantPalette {
+  const VivrantPalette._({
+    required this.isDark,
+    required this.ink,
+    required this.muted,
+    required this.accent,
+    required this.accentDeep,
+    required this.accentSoft,
+    required this.cyan,
+    required this.card,
+    required this.panel,
+    required this.surface,
+    required this.surfaceSoft,
+    required this.brandGradient,
+    required this.bodyGradient,
+  });
+
+  final bool isDark;
+  final Color ink;
+  final Color muted;
+  final Color accent;
+  final Color accentDeep;
+  final Color accentSoft;
+  final Color cyan;
+  final Color card;
+  final Color panel;
+  final Color surface;
+  final Color surfaceSoft;
+  final LinearGradient brandGradient;
+  final LinearGradient bodyGradient;
+
+  /// Back-compat alias used by widgets.
+  bool get dark => isDark;
+
+  static const light = VivrantPalette._(
+    isDark: false,
+    ink: VivrantColors.ink,
+    muted: VivrantColors.muted,
+    accent: VivrantColors.accent,
+    accentDeep: VivrantColors.accentDeep,
+    accentSoft: VivrantColors.accentSoft,
+    cyan: VivrantColors.cyan,
+    card: VivrantColors.card,
+    panel: VivrantColors.panel,
+    surface: VivrantColors.surface,
+    surfaceSoft: VivrantColors.surfaceSoft,
+    brandGradient: VivrantColors.brandGradient,
+    bodyGradient: VivrantColors.bodyGradient,
+  );
+
+  static const darkMode = VivrantPalette._(
+    isDark: true,
+    ink: VivrantColors.darkInk,
+    muted: VivrantColors.darkMuted,
+    accent: VivrantColors.darkAccent,
+    accentDeep: VivrantColors.darkAccentDeep,
+    accentSoft: VivrantColors.darkAccentSoft,
+    cyan: VivrantColors.darkCyan,
+    card: VivrantColors.darkCard,
+    panel: VivrantColors.darkPanel,
+    surface: VivrantColors.darkSurface,
+    surfaceSoft: VivrantColors.darkSurfaceSoft,
+    brandGradient: VivrantColors.darkBrandGradient,
+    bodyGradient: VivrantColors.darkBodyGradient,
   );
 }

@@ -30,7 +30,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     try {
       await ref.read(vivrantApiProvider).forgotPassword(_email.text.trim());
       if (!mounted) return;
-      context.showSuccess('Check your inbox for a reset link.');
+      context.showSuccess(
+        'Check your inbox. Open the link in a browser to set a new password.',
+      );
       context.go('/login');
     } catch (e) {
       if (!mounted) return;
@@ -54,7 +56,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               highlight: 'password',
             ),
             Text(
-              'We will email you a reset link.',
+              'We will email you a reset link. Open it in a browser to choose a new password — it works for both web and mobile sign-in.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),

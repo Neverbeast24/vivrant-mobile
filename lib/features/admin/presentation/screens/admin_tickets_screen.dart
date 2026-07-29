@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class AdminTicketsScreen extends ConsumerStatefulWidget {
   const AdminTicketsScreen({super.key});
@@ -14,24 +15,73 @@ class AdminTicketsScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
+  final _query = TextEditingController();
   List<Map<String, dynamic>> _tickets = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<Map<String, dynamic>>>(ModuleCacheKeys.adminTickets);
+    if (cached != null) {
+      _tickets = cached
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      _loading = false;
+    }
     _load();
   }
 
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  static String _titleCase(String value) {
+    if (value.isEmpty) return value;
+    return value
+        .split(RegExp(r'[_\s]+'))
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
+  List<String> get _statuses {
+    final values = _tickets
+        .map((t) => t['status']?.toString() ?? 'open')
+        .toSet()
+        .toList()
+      ..sort();
+    return values;
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _tickets.where((ticket) {
+      final status = ticket['status']?.toString() ?? 'open';
+      if (_filter != 'all' && status != _filter) return false;
+      if (q.isEmpty) return true;
+      return (ticket['subject']?.toString().toLowerCase() ?? '').contains(q) ||
+          (ticket['description']?.toString().toLowerCase() ?? '').contains(q) ||
+          (ticket['display_name']?.toString().toLowerCase() ?? '').contains(q) ||
+          status.toLowerCase().contains(q);
+    }).toList();
+  }
+
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.adminTickets);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final tickets = await ref.read(vivrantApiProvider).adminTickets();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.adminTickets, tickets);
       setState(() {
         _tickets = tickets;
         _loading = false;
@@ -133,34 +183,70 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
               const LoadingView()
             else if (_tickets.isEmpty)
               const EmptyState(message: 'No tickets yet.')
-            else
-              ..._tickets.map(
-                (ticket) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: VivrantPanel(
-                    child: InkWell(
-                      onTap: () => _edit(ticket),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            ticket['subject']?.toString() ?? 'Ticket',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '#${ticket['id']} · ${ticket['display_name'] ?? 'Member'} · '
-                            '${ticket['status'] ?? 'open'}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(ticket['description']?.toString() ?? ''),
-                        ],
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search tickets…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _tickets.length,
+                  ),
+                  ..._statuses.map(
+                    (s) => VivrantFilterOption(
+                      value: s,
+                      label: _titleCase(s),
+                      count: _tickets
+                          .where(
+                            (t) => (t['status']?.toString() ?? 'open') == s,
+                          )
+                          .length,
+                    ),
+                  ),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (_filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No tickets match these filters. Try All or another search.',
+                )
+              else
+                ..._filtered.map(
+                  (ticket) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: VivrantPanel(
+                      child: InkWell(
+                        onTap: () => _edit(ticket),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ticket['subject']?.toString() ?? 'Ticket',
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '#${ticket['id']} · ${ticket['display_name'] ?? 'Member'} · '
+                              '${ticket['status'] ?? 'open'}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(ticket['description']?.toString() ?? ''),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+            ],
           ],
         ),
       ),

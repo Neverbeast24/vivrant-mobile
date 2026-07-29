@@ -10,6 +10,7 @@ class SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, top: 4),
       child: Row(
@@ -18,7 +19,7 @@ class SectionLabel extends StatelessWidget {
             child: Text(
               text.toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: VivrantColors.ink.withValues(alpha: 0.58),
+                    color: c.ink.withValues(alpha: 0.58),
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.1,

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
-import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
+import '../../../../shared/providers/module_cache.dart';
 import '../gym_labels.dart';
 import '../widgets/exercise_demo_card.dart';
 import '../widgets/exercise_demo_sheet.dart';
@@ -29,6 +29,13 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<GymExercise>>(ModuleCacheKeys.gymMachines);
+    if (cached != null) {
+      _exercises = List<GymExercise>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
@@ -46,18 +53,21 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
   }
 
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.gymMachines);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final rows = await ref.read(vivrantApiProvider).gymExercises();
       if (!mounted) return;
+      final exercises = rows
+          .map(GymExercise.fromJson)
+          .where((e) => e.isMachine)
+          .toList(growable: false);
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymMachines, exercises);
       setState(() {
-        _exercises = rows
-            .map(GymExercise.fromJson)
-            .where((e) => e.isMachine)
-            .toList(growable: false);
+        _exercises = exercises;
         _loading = false;
       });
     } catch (e) {
@@ -141,69 +151,22 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
             else if (_exercises.isEmpty)
               const EmptyState(message: 'No machine demos yet.')
             else ...[
-              TextField(
+              VivrantSearchField(
                 controller: _query,
+                hintText: 'Search machines…',
                 onChanged: (_) => setState(() {}),
-                textInputAction: TextInputAction.search,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: VivrantColors.ink,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Search machines…',
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: VivrantColors.ink.withValues(alpha: 0.45),
-                  ),
-                  suffixIcon: _query.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear',
-                          onPressed: () {
-                            _query.clear();
-                            setState(() {});
-                          },
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: VivrantColors.ink.withValues(alpha: 0.45),
-                          ),
-                        ),
-                ),
               ),
               const SizedBox(height: 14),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _muscleOptions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      FilterChip(
-                        label: Text(muscleFilterLabel(_muscleOptions[i])),
-                        selected: _muscle == _muscleOptions[i],
-                        showCheckmark: false,
-                        onSelected: (_) =>
-                            setState(() => _muscle = _muscleOptions[i]),
-                        selectedColor: VivrantColors.accentSoft,
-                        backgroundColor: VivrantColors.panel,
-                        side: BorderSide(
-                          color: _muscle == _muscleOptions[i]
-                              ? VivrantColors.accent.withValues(alpha: 0.35)
-                              : VivrantColors.ink.withValues(alpha: 0.1),
-                        ),
-                        labelStyle: TextStyle(
-                          color: _muscle == _muscleOptions[i]
-                              ? VivrantColors.accentDeep
-                              : VivrantColors.ink,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  ],
-                ),
+              VivrantFilterChips<String>(
+                options: [
+                  for (final muscle in _muscleOptions)
+                    VivrantFilterOption(
+                      value: muscle,
+                      label: muscleFilterLabel(muscle),
+                    ),
+                ],
+                selected: _muscle,
+                onSelected: (v) => setState(() => _muscle = v),
               ),
               const SizedBox(height: 18),
               if (filtered.isEmpty)

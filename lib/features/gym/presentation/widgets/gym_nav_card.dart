@@ -57,14 +57,18 @@ class _GymNavCardState extends State<GymNavCard> {
           child: Ink(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: widget.featured ? VivrantColors.brandGradient : null,
+              gradient: widget.featured
+                  ? (dark
+                      ? VivrantColors.darkBrandGradient
+                      : VivrantColors.brandGradient)
+                  : null,
               color: bg,
               border: widget.featured
                   ? null
                   : Border.all(color: ink.withValues(alpha: 0.06)),
               boxShadow: [
                 BoxShadow(
-                  color: VivrantColors.accent.withValues(
+                  color: accent.withValues(
                     alpha: widget.featured
                         ? (dark ? 0.28 : 0.18)
                         : (dark ? 0.08 : 0.05),

@@ -19,6 +19,7 @@ class ScorePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -35,9 +36,9 @@ class ScorePicker extends StatelessWidget {
               label: Text('$n'),
               selected: selected,
               onSelected: (_) => onChanged(n),
-              selectedColor: VivrantColors.accentSoft,
+              selectedColor: c.accentSoft,
               labelStyle: TextStyle(
-                color: selected ? VivrantColors.accent : VivrantColors.ink,
+                color: selected ? c.accent : c.ink,
                 fontWeight: FontWeight.w800,
               ),
             );

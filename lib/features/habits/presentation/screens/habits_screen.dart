@@ -7,6 +7,7 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class HabitsScreen extends ConsumerStatefulWidget {
   const HabitsScreen({super.key});
@@ -16,28 +17,52 @@ class HabitsScreen extends ConsumerStatefulWidget {
 }
 
 class _HabitsScreenState extends ConsumerState<HabitsScreen> {
+  final _query = TextEditingController();
   List<Habit> _habits = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<Habit>>(ModuleCacheKeys.habits);
+    if (cached != null) {
+      _habits = List<Habit>.from(cached);
+      _loading = false;
+    }
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  void _setHabits(List<Habit> habits) {
+    ref.read(moduleCacheProvider).write(ModuleCacheKeys.habits, habits);
     setState(() {
-      _loading = true;
+      _habits = habits;
+      _loading = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _load() async {
+    final showSpinner = ref
+        .read(moduleCacheProvider)
+        .shouldShowSpinner(ModuleCacheKeys.habits);
+    setState(() {
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final habits = await ref.read(vivrantApiProvider).listHabits();
       if (!mounted) return;
-      setState(() {
-        _habits = habits;
-        _loading = false;
-      });
+      _setHabits(habits);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -48,15 +73,17 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   }
 
   Future<void> _add() async {
-    final ctrl = TextEditingController();
+    var title = '';
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('New habit'),
         content: TextField(
-          controller: ctrl,
           decoration: const InputDecoration(hintText: 'Habit title'),
           autofocus: true,
+          textInputAction: TextInputAction.done,
+          onChanged: (value) => title = value,
+          onSubmitted: (_) => Navigator.pop(c, true),
         ),
         actions: [
           TextButton(
@@ -70,10 +97,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
         ],
       ),
     );
-    if (ok == true && ctrl.text.trim().isNotEmpty && mounted) {
+    title = title.trim();
+    if (ok == true && title.isNotEmpty && mounted) {
       try {
-        await ref.read(vivrantApiProvider).addHabit(ctrl.text.trim());
-        _load();
+        final habit = await ref.read(vivrantApiProvider).addHabit(title);
+        if (!mounted) return;
+        _setHabits([..._habits, habit]);
+        context.showSuccess('Habit added');
       } catch (e) {
         if (!mounted) return;
         context.showError(apiErrorMessage(e));
@@ -81,9 +111,51 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     }
   }
 
+  Future<void> _toggle(Habit h, bool done) async {
+    final prev = List<Habit>.from(_habits);
+    _setHabits([
+      for (final item in _habits)
+        if (item.id == h.id) item.copyWith(doneToday: done) else item,
+    ]);
+    try {
+      await ref.read(vivrantApiProvider).toggleHabit(h.id, done);
+      if (!mounted) return;
+      context.showSuccess(done ? 'Habit checked' : 'Habit unchecked');
+    } catch (e) {
+      if (!mounted) return;
+      _setHabits(prev);
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _delete(Habit h) async {
+    final prev = List<Habit>.from(_habits);
+    _setHabits(_habits.where((item) => item.id != h.id).toList());
+    try {
+      await ref.read(vivrantApiProvider).deleteHabit(h.id);
+      if (!mounted) return;
+      context.showSuccess('Habit removed');
+    } catch (e) {
+      if (!mounted) return;
+      _setHabits(prev);
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  List<Habit> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _habits.where((h) {
+      if (_filter == 'done' && !h.doneToday) return false;
+      if (_filter == 'todo' && h.doneToday) return false;
+      if (q.isEmpty) return true;
+      return h.title.toLowerCase().contains(q);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final done = _habits.where((h) => h.doneToday).length;
+    final filtered = _filtered;
     return GradientScaffold(
       appBar: AppBar(
         title: const Text('Habits'),
@@ -130,57 +202,72 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   child: const Text('Add habit'),
                 ),
               )
-            else
-              ..._habits.map(
-                (h) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: VivrantPanel(
-                    child: Row(
-                      children: [
-                        Checkbox(
-                          value: h.doneToday,
-                          onChanged: (v) async {
-                            try {
-                              await ref
-                                  .read(vivrantApiProvider)
-                                  .toggleHabit(h.id, v ?? false);
-                              _load();
-                            } catch (e) {
-                              if (!mounted) return;
-                              context.showError(apiErrorMessage(e));
-                            }
-                          },
-                        ),
-                        Expanded(
-                          child: Text(
-                            h.title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              decoration: h.doneToday
-                                  ? TextDecoration.lineThrough
-                                  : null,
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search habits…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _habits.length,
+                  ),
+                  VivrantFilterOption(
+                    value: 'done',
+                    label: 'Done',
+                    count: done,
+                  ),
+                  VivrantFilterOption(
+                    value: 'todo',
+                    label: 'To do',
+                    count: _habits.length - done,
+                  ),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No habits match these filters. Try All or another search.',
+                )
+              else
+                ...filtered.map(
+                  (h) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: VivrantPanel(
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: h.doneToday,
+                            onChanged: (v) => _toggle(h, v ?? false),
+                          ),
+                          Expanded(
+                            child: Text(
+                              h.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                decoration: h.doneToday
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
                             ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            try {
-                              await ref
-                                  .read(vivrantApiProvider)
-                                  .deleteHabit(h.id);
-                              _load();
-                            } catch (e) {
-                              if (!mounted) return;
-                              context.showError(apiErrorMessage(e));
-                            }
-                          },
-                        ),
-                      ],
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _delete(h),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+            ],
           ],
         ),
       ),

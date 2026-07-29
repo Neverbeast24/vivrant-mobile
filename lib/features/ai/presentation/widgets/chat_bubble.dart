@@ -15,6 +15,7 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -24,15 +25,14 @@ class ChatBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.8,
         ),
         decoration: BoxDecoration(
-          color: isUser
-              ? VivrantColors.accentSoft
-              : Theme.of(context).cardTheme.color,
+          color: isUser ? c.accentSoft : Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: VivrantColors.ink.withValues(alpha: 0.08),
-          ),
+          border: Border.all(color: c.ink.withValues(alpha: 0.08)),
         ),
-        child: Text(content),
+        child: Text(
+          content,
+          style: TextStyle(color: c.ink, height: 1.4),
+        ),
       ),
     );
   }

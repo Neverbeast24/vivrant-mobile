@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/module_cache.dart';
 
 class AdminUsersScreen extends ConsumerStatefulWidget {
   const AdminUsersScreen({super.key});
@@ -14,30 +15,75 @@ class AdminUsersScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
+  final _query = TextEditingController();
   List<Map<String, dynamic>> _users = [];
   bool _canManageRoles = false;
   bool _loading = true;
   String? _error;
+  String _filter = 'all';
 
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.adminUsers);
+    if (cached != null) {
+      final users = cached['users'];
+      if (users is List) {
+        _users = users
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      _canManageRoles = cached['canManageRoles'] == true;
+      _loading = false;
+    }
     _load();
   }
 
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    final q = _query.text.trim().toLowerCase();
+    return _users.where((user) {
+      final status = user['status']?.toString() ?? 'active';
+      final role = user['role']?.toString() ?? 'user';
+      if (_filter == 'active' && status != 'active') return false;
+      if (_filter == 'suspended' && status != 'suspended') return false;
+      if (_filter == 'admin' && !role.contains('admin')) return false;
+      if (_filter == 'user' && role != 'user') return false;
+      if (q.isEmpty) return true;
+      return (user['display_name']?.toString().toLowerCase() ?? '').contains(q) ||
+          (user['email']?.toString().toLowerCase() ?? '').contains(q) ||
+          role.toLowerCase().contains(q) ||
+          status.toLowerCase().contains(q);
+    }).toList();
+  }
+
   Future<void> _load() async {
+    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.adminUsers);
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(vivrantApiProvider).adminUsers();
       if (!mounted) return;
+      final users = (data['users'] as List? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final canManageRoles = data['canManageRoles'] == true;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.adminUsers, {
+        'users': users,
+        'canManageRoles': canManageRoles,
+      });
       setState(() {
-        _users = (data['users'] as List? ?? [])
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        _canManageRoles = data['canManageRoles'] == true;
+        _users = users;
+        _canManageRoles = canManageRoles;
         _loading = false;
       });
     } catch (e) {
@@ -122,6 +168,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
     return GradientScaffold(
       appBar: AppBar(title: const Text('Users')),
       child: RefreshIndicator(
@@ -146,25 +193,58 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
               const LoadingView()
             else if (_users.isEmpty)
               const EmptyState(message: 'No users found.')
-            else
-              ..._users.map(
-                (user) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: VivrantPanel(
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(user['display_name']?.toString() ?? 'Member'),
-                      subtitle: Text(
-                        '${user['email'] ?? '—'}\n'
-                        '${user['role'] ?? 'user'} · ${user['status'] ?? 'active'}',
+            else ...[
+              VivrantSearchField(
+                controller: _query,
+                hintText: 'Search users…',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              VivrantFilterChips<String>(
+                options: [
+                  VivrantFilterOption(
+                    value: 'all',
+                    label: 'All',
+                    count: _users.length,
+                  ),
+                  const VivrantFilterOption(value: 'active', label: 'Active'),
+                  const VivrantFilterOption(
+                    value: 'suspended',
+                    label: 'Suspended',
+                  ),
+                  const VivrantFilterOption(value: 'admin', label: 'Admins'),
+                  const VivrantFilterOption(value: 'user', label: 'Users'),
+                ],
+                selected: _filter,
+                onSelected: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (filtered.isEmpty)
+                const EmptyState(
+                  message:
+                      'No users match these filters. Try All or another search.',
+                )
+              else
+                ...filtered.map(
+                  (user) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: VivrantPanel(
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title:
+                            Text(user['display_name']?.toString() ?? 'Member'),
+                        subtitle: Text(
+                          '${user['email'] ?? '—'}\n'
+                          '${user['role'] ?? 'user'} · ${user['status'] ?? 'active'}',
+                        ),
+                        isThreeLine: true,
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => _edit(user),
                       ),
-                      isThreeLine: true,
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => _edit(user),
                     ),
                   ),
                 ),
-              ),
+            ],
           ],
         ),
       ),

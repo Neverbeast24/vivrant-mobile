@@ -9,6 +9,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/providers/module_cache.dart';
 import '../widgets/quick_actions_row.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
@@ -26,17 +27,26 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<Map<String, dynamic>>(ModuleCacheKeys.today);
+    if (cached != null) {
+      _data = cached;
+      _loading = false;
+    }
     _load();
   }
 
   Future<void> _load() async {
+    final showSpinner = _data == null;
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
       final data = await ref.read(vivrantApiProvider).getToday();
       if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.today, data);
       setState(() {
         _data = data;
         _loading = false;
@@ -100,6 +110,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     final profile = ref.watch(authProvider).profile;
     final checkin = _data?['checkin'] as Map?;
     final calories = (_data?['calories'] as num?)?.toInt() ?? 0;
@@ -113,7 +124,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _load,
-        color: VivrantColors.accent,
+        color: c.accent,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
@@ -128,7 +139,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                   onPressed: () => context.push('/profile'),
                   icon: CircleAvatar(
                     radius: 16,
-                    backgroundColor: VivrantColors.accentSoft,
+                    backgroundColor: c.accentSoft,
                     backgroundImage: profile?.avatarUrl != null
                         ? NetworkImage(profile!.avatarUrl!)
                         : null,
@@ -138,8 +149,8 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                                     ? profile!.displayName[0]
                                     : 'V')
                                 .toUpperCase(),
-                            style: const TextStyle(
-                              color: VivrantColors.accent,
+                            style: TextStyle(
+                              color: c.accent,
                               fontWeight: FontWeight.w800,
                             ),
                           )

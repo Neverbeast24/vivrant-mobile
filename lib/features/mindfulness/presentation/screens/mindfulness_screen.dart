@@ -74,10 +74,15 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
                   children: List.generate(5, (i) {
                     final n = i + 1;
                     final selected = _mood == n;
+                    final c = VivrantColors.of(context);
                     return ChoiceChip(
                       label: Text('$n'),
                       selected: selected,
-                      selectedColor: VivrantColors.accentSoft,
+                      selectedColor: c.accentSoft,
+                      labelStyle: TextStyle(
+                        color: selected ? c.accent : c.ink,
+                        fontWeight: FontWeight.w800,
+                      ),
                       onSelected: (_) => setState(() => _mood = n),
                     );
                   }),

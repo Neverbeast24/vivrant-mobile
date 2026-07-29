@@ -19,6 +19,7 @@ class PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
@@ -31,7 +32,7 @@ class PageHeader extends StatelessWidget {
                 Text(
                   eyebrow.toUpperCase(),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: VivrantColors.accent,
+                        color: c.accent,
                         letterSpacing: 2,
                       ),
                 ),
@@ -41,9 +42,12 @@ class PageHeader extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: title,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: VivrantColors.ink,
+                              color: c.ink,
                               height: 1.15,
                             ),
                       ),
@@ -54,7 +58,7 @@ class PageHeader extends StatelessWidget {
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
                             height: 1.15,
-                            color: VivrantColors.accentDeep,
+                            color: c.accentDeep,
                           ),
                         ),
                     ],

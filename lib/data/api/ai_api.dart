@@ -10,12 +10,16 @@ extension VivrantAiApi on VivrantApi {
   Future<Map<String, dynamic>> weeklyStory() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/reports/weekly-story',
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
   Future<List<AiChatMessage>> chatHistory() async {
-    final res = await _client.get<Map<String, dynamic>>('/api/mobile/ai/chat');
+    final res = await _client.get<Map<String, dynamic>>(
+      '/api/mobile/ai/chat',
+      options: ApiClient.aiOptions,
+    );
     return (res.data?['messages'] as List? ?? [])
         .map((e) => AiChatMessage.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -25,6 +29,7 @@ extension VivrantAiApi on VivrantApi {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/ai/chat',
       data: {'question': question},
+      options: ApiClient.aiOptions,
     );
     return AiChatMessage.fromJson(
       Map<String, dynamic>.from(res.data?['message'] ?? res.data ?? {}),
@@ -32,8 +37,10 @@ extension VivrantAiApi on VivrantApi {
   }
 
   Future<Map<String, dynamic>> generateInsight() async {
-    final res =
-        await _client.post<Map<String, dynamic>>('/api/mobile/ai/insights');
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/ai/insights',
+      options: ApiClient.aiOptions,
+    );
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
@@ -45,8 +52,14 @@ extension VivrantAiApi on VivrantApi {
         .toList();
   }
 
-  Future<void> createReminder(Map<String, dynamic> body) async {
-    await _client.post('/api/mobile/ai/reminders', data: body);
+  Future<Map<String, dynamic>> createReminder(Map<String, dynamic> body) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/ai/reminders',
+      data: body,
+    );
+    return Map<String, dynamic>.from(
+      res.data?['reminder'] as Map? ?? res.data ?? {},
+    );
   }
 
   Future<void> toggleReminder(int id, bool enabled) async {

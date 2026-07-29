@@ -8,31 +8,37 @@ class VivrantBrand extends StatelessWidget {
   const VivrantBrand({
     super.key,
     this.compact = false,
-    this.dark = false,
+    this.dark,
   });
 
   final bool compact;
-  final bool dark;
+
+  /// When null, follows [Theme] brightness.
+  final bool? dark;
 
   @override
   Widget build(BuildContext context) {
-    final ink = dark ? Colors.white : VivrantColors.ink;
-    final muted = dark ? Colors.white60 : VivrantColors.muted;
+    final isDark = dark ?? Theme.of(context).brightness == Brightness.dark;
+    final c = VivrantColors.forBrightness(
+      isDark ? Brightness.dark : Brightness.light,
+    );
+    final ink = isDark ? Colors.white : c.ink;
+    final muted = isDark ? Colors.white60 : c.muted;
 
     final mark = Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: isDark ? Colors.white : Colors.black,
         borderRadius: BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,
       child: Image.asset(
         'assets/brand/vivrant-mark.png',
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(
+        errorBuilder: (_, __, ___) => Icon(
           Icons.spa_rounded,
-          color: VivrantColors.accent,
+          color: c.accent,
         ),
       ),
     );

@@ -17,14 +17,15 @@ class IconWell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: VivrantColors.accentSoft,
+        color: c.accentSoft,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, color: VivrantColors.accent, size: iconSize),
+      child: Icon(icon, color: c.accent, size: iconSize),
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/vivrant_colors.dart';
+
 /// Full-width inverse primary action (matches web PrimaryButton).
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
@@ -17,17 +19,20 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final spinnerColor =
+        dark ? VivrantColors.darkSolid : Colors.white;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: loading ? null : onPressed,
         child: loading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: spinnerColor,
                 ),
               )
             : icon == null

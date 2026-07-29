@@ -67,6 +67,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 onPageChanged: (i) => setState(() => _index = i),
                 itemBuilder: (context, i) {
                   final page = _pages[i];
+                  final c = VivrantColors.of(context);
                   return Padding(
                     padding: const EdgeInsets.all(28),
                     child: Column(
@@ -76,13 +77,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           width: 88,
                           height: 88,
                           decoration: BoxDecoration(
-                            color: VivrantColors.accentSoft,
+                            color: c.accentSoft,
                             borderRadius: BorderRadius.circular(28),
                           ),
                           child: Icon(
                             page.icon,
                             size: 40,
-                            color: VivrantColors.accent,
+                            color: c.accent,
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -96,7 +97,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           page.body,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: VivrantColors.muted,
+                                color: c.muted,
                               ),
                         ),
                       ],
@@ -109,6 +110,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(_pages.length, (i) {
                 final active = i == _index;
+                final c = VivrantColors.of(context);
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -116,8 +118,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   height: 8,
                   decoration: BoxDecoration(
                     color: active
-                        ? VivrantColors.accent
-                        : VivrantColors.ink.withValues(alpha: 0.15),
+                        ? c.accent
+                        : c.ink.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(99),
                   ),
                 );
