@@ -96,10 +96,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: SlideTransition(
                 position: _slide,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
                   children: [
-                    const VivrantBrand(),
-                    const SizedBox(height: 32),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: VivrantBrand(),
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'WELCOME BACK',
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -108,7 +111,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         letterSpacing: 2.2,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Text.rich(
                       TextSpan(
                         children: [
@@ -139,7 +142,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Text(
                       'Sign in to continue your healthier rhythm — nutrition, movement, sleep, and quiet AI guidance.',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -148,7 +151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 22),
                     Material(
                       color: panel.withValues(alpha: dark ? 0.92 : 0.94),
                       elevation: 0,
@@ -275,31 +278,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 28),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Divider(color: ink.withValues(alpha: 0.08)),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Text(
-                            'BUILT AROUND YOU',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 11.5,
-                              letterSpacing: 1.4,
-                              color: muted.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Divider(color: ink.withValues(alpha: 0.08)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const _PillGrid(),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 22),
+                    const _BuiltAroundYou(),
+                    const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -326,7 +307,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     Text(
                       'Wellness guidance only — not a substitute for professional medical care.',
                       textAlign: TextAlign.center,
@@ -388,75 +369,183 @@ class _LoginErrorBanner extends StatelessWidget {
   }
 }
 
-class _PillGrid extends StatelessWidget {
-  const _PillGrid();
+class _BuiltAroundYou extends StatelessWidget {
+  const _BuiltAroundYou();
 
   static const _items = [
-    (label: 'Nutrition', icon: Icons.eco_outlined),
-    (label: 'Movement', icon: Icons.directions_run_rounded),
-    (label: 'Sleep', icon: Icons.nightlight_round),
-    (label: 'AI insights', icon: Icons.auto_awesome_outlined),
+    (
+      label: 'Nutrition',
+      hint: 'Fuel well',
+      icon: Icons.eco_outlined,
+    ),
+    (
+      label: 'Movement',
+      hint: 'Stay active',
+      icon: Icons.directions_run_rounded,
+    ),
+    (
+      label: 'Sleep',
+      hint: 'Rest deep',
+      icon: Icons.nightlight_round,
+    ),
+    (
+      label: 'Insights',
+      hint: 'AI-guided',
+      icon: Icons.auto_awesome_outlined,
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var row = 0; row < 2; row++) ...[
-          if (row > 0) const SizedBox(height: 8),
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
+    final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
+    final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
+    final panel = dark ? VivrantColors.darkPanel : Colors.white;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: panel.withValues(alpha: dark ? 0.72 : 0.78),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ink.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
-              for (var col = 0; col < 2; col++) ...[
-                if (col > 0) const SizedBox(width: 8),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent,
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'BUILT AROUND YOU',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 12,
+                  letterSpacing: 1.6,
+                  fontWeight: FontWeight.w800,
+                  color: muted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Four pillars, one daily rhythm.',
+            style: GoogleFonts.instrumentSerif(
+              fontSize: 16,
+              fontStyle: FontStyle.italic,
+              height: 1.25,
+              color: ink.withValues(alpha: 0.88),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (var i = 0; i < _items.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
                 Expanded(
-                  child: _Pill(
-                    label: _items[row * 2 + col].label,
-                    icon: _items[row * 2 + col].icon,
+                  child: _FeatureTile(
+                    label: _items[i].label,
+                    hint: _items[i].hint,
+                    icon: _items[i].icon,
                   ),
                 ),
               ],
             ],
           ),
         ],
-      ],
+      ),
     );
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.icon});
+class _FeatureTile extends StatelessWidget {
+  const _FeatureTile({
+    required this.label,
+    required this.hint,
+    required this.icon,
+  });
 
   final String label;
+  final String hint;
   final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
+    final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
     final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
     final soft =
         dark ? VivrantColors.darkAccentSoft : VivrantColors.accentSoft;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
       decoration: BoxDecoration(
-        color: soft.withValues(alpha: dark ? 0.7 : 0.85),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withValues(alpha: 0.12)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            soft.withValues(alpha: dark ? 0.85 : 0.95),
+            soft.withValues(alpha: dark ? 0.45 : 0.55),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.14)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
         children: [
-          Icon(icon, size: 17, color: accent),
-          const SizedBox(width: 7),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: accent,
-              ),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: dark
+                  ? Colors.black.withValues(alpha: 0.22)
+                  : Colors.white.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withValues(alpha: 0.12)),
+            ),
+            child: Icon(icon, size: 18, color: accent),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              height: 1.15,
+              color: ink,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            hint,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+              color: muted,
             ),
           ),
         ],
