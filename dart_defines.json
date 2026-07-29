@@ -1,0 +1,5 @@
+{
+  "API_BASE_URL": "http://10.0.2.2:3000",
+  "SUPABASE_URL": "https://gcqbuccazplfpmuhperg.supabase.co",
+  "SUPABASE_ANON_KEY": "sb_publishable_LZIrdY7BOosvGebRjMPMeA_rgP_uKzJ"
+}

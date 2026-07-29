@@ -1,0 +1,198 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/widgets/widgets.dart';
+import '../../../../data/vivrant_api.dart';
+import '../../../../shared/models/models.dart';
+
+class JournalScreen extends ConsumerStatefulWidget {
+  const JournalScreen({super.key});
+
+  @override
+  ConsumerState<JournalScreen> createState() => _JournalScreenState();
+}
+
+class _JournalScreenState extends ConsumerState<JournalScreen> {
+  List<JournalEntry> _entries = [];
+  bool _loading = true;
+  String? _error;
+  final _title = TextEditingController();
+  final _body = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final entries = await ref.read(vivrantApiProvider).listJournal();
+      if (!mounted) return;
+      setState(() {
+        _entries = entries;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = apiErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    if (_body.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(vivrantApiProvider).saveJournal({
+        if (_title.text.trim().isNotEmpty) 'title': _title.text.trim(),
+        'body': _body.text.trim(),
+      });
+      _title.clear();
+      _body.clear();
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _reflect() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).reflectJournal();
+      if (!mounted) return;
+      context.showInfo(res['reflection']?.toString() ?? res.toString());
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GradientScaffold(
+      appBar: AppBar(title: const Text('Journal')),
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const PageHeader(
+              eyebrow: 'Reflect',
+              title: 'Your',
+              highlight: 'journal',
+            ),
+            VivrantPanel(
+              title: 'New entry',
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _title,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _body,
+                    decoration: const InputDecoration(labelText: 'Body'),
+                    maxLines: 4,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    child: Text(_saving ? 'Saving…' : 'Save entry'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _reflect,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Reflect with AI'),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_error != null)
+              EmptyState(
+                message: _error!,
+                action: OutlinedButton(
+                  onPressed: _load,
+                  child: const Text('Retry'),
+                ),
+              )
+            else if (_entries.isEmpty)
+              const EmptyState(message: 'No journal entries yet.')
+            else
+              ..._entries.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: VivrantPanel(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                e.title?.isNotEmpty == true
+                                    ? e.title!
+                                    : e.entryDate,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                e.body,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () async {
+                            try {
+                              await ref
+                                  .read(vivrantApiProvider)
+                                  .deleteJournal(e.id);
+                              _load();
+                            } catch (err) {
+                              if (!mounted) return;
+                              context.showError(apiErrorMessage(err));
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
