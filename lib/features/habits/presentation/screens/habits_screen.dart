@@ -237,35 +237,42 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                       'No habits match these filters. Try All or another search.',
                 )
               else
-                ...filtered.map(
-                  (h) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: VivrantPanel(
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: h.doneToday,
-                            onChanged: (v) => _toggle(h, v ?? false),
-                          ),
-                          Expanded(
-                            child: Text(
-                              h.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                decoration: h.doneToday
-                                    ? TextDecoration.lineThrough
-                                    : null,
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final h = filtered[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: VivrantPanel(
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: h.doneToday,
+                              onChanged: (v) => _toggle(h, v ?? false),
+                            ),
+                            Expanded(
+                              child: Text(
+                                h.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  decoration: h.doneToday
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () => _delete(h),
-                          ),
-                        ],
+                            IconButton(
+                              tooltip: 'Delete habit',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _delete(h),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
             ],
           ],

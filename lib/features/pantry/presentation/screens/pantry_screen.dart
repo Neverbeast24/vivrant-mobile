@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -126,7 +127,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
         ..._categories.map(
           (c) => VivrantFilterOption(
             value: 'cat:$c',
-            label: _titleCase(c),
+            label: humanizeLabel(c),
             count: _items.where((i) => i.category == c).length,
           ),
         ),
@@ -146,14 +147,6 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     }).toList();
   }
 
-  static String _titleCase(String value) {
-    if (value.isEmpty) return value;
-    return value
-        .split(RegExp(r'[_\s]+'))
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final low = _items.where((i) => i.isLowStock).length;
@@ -163,6 +156,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
         title: const Text('Pantry'),
         actions: [
           IconButton(
+            tooltip: 'Add pantry item',
             onPressed: () => context.push('/pantry/add'),
             icon: const Icon(Icons.add),
           ),

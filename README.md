@@ -42,7 +42,7 @@ Domain CRUD and Gemini coaching stay on the server. Flutter never embeds `GEMINI
 | **Support** | Member tickets |
 | **Notifications** | Inbox + FCM device registration |
 
-Admin console remains **web-only**.
+Staff/admin tools are available in-app for elevated roles (overview, users, tickets, audit). The full admin console remains richest on web.
 
 ---
 
@@ -71,10 +71,9 @@ lib/
 │   └── shell/                   # AppShell + MoreMenuScreen
 ├── config/                      # Env / dart-defines
 ├── core/
-│   ├── network/                 # Dio ApiClient
-│   ├── storage/                 # TokenStorage
+│   ├── network/                 # Dio ApiClient (secure token storage)
 │   ├── theme/                   # colors + ThemeData (+ theme.dart barrel)
-│   ├── utils/                   # formatters, validators, context extensions
+│   ├── utils/                   # formatters, validators, humanize, context extensions
 │   └── widgets/                 # one widget per file (+ widgets.dart barrel)
 │       ├── brand.dart
 │       ├── empty_state.dart / error_view.dart / loading_view.dart

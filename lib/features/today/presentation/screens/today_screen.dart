@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -132,16 +133,18 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
               children: [
                 const Expanded(child: VivrantBrand()),
                 IconButton(
+                  tooltip: 'Notifications',
                   onPressed: () => context.push('/notifications'),
                   icon: const Icon(Icons.notifications_outlined),
                 ),
                 IconButton(
+                  tooltip: 'Profile',
                   onPressed: () => context.push('/profile'),
                   icon: CircleAvatar(
                     radius: 16,
                     backgroundColor: c.accentSoft,
                     backgroundImage: profile?.avatarUrl != null
-                        ? NetworkImage(profile!.avatarUrl!)
+                        ? CachedNetworkImageProvider(profile!.avatarUrl!)
                         : null,
                     child: profile?.avatarUrl == null
                         ? Text(

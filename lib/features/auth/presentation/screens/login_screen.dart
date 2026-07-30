@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/validators.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../widgets/social_auth_buttons.dart';
@@ -18,6 +19,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _emailFocus = FocusNode();
@@ -56,6 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _loading = true;
       _formError = null;
@@ -175,104 +178,110 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-                          child: AutofillGroup(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                TextField(
-                                  controller: _email,
-                                  focusNode: _emailFocus,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  autofillHints: const [AutofillHints.email],
-                                  onSubmitted: (_) =>
-                                      _passwordFocus.requestFocus(),
-                                  decoration: InputDecoration(
-                                    labelText: 'Email',
-                                    hintText: 'you@example.com',
-                                    prefixIcon: Icon(
-                                      Icons.mail_outline_rounded,
-                                      size: 22,
-                                      color: muted,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                TextField(
-                                  controller: _password,
-                                  focusNode: _passwordFocus,
-                                  obscureText: _obscure,
-                                  textInputAction: TextInputAction.done,
-                                  onSubmitted: (_) {
-                                    if (!_loading) _submit();
-                                  },
-                                  autofillHints: const [
-                                    AutofillHints.password,
-                                  ],
-                                  decoration: InputDecoration(
-                                    labelText: 'Password',
-                                    hintText: 'Your password',
-                                    prefixIcon: Icon(
-                                      Icons.lock_outline_rounded,
-                                      size: 22,
-                                      color: muted,
-                                    ),
-                                    suffixIcon: IconButton(
-                                      tooltip: _obscure
-                                          ? 'Show password'
-                                          : 'Hide password',
-                                      icon: Icon(
-                                        _obscure
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
+                          child: Form(
+                            key: _formKey,
+                            child: AutofillGroup(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TextFormField(
+                                    controller: _email,
+                                    focusNode: _emailFocus,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    autofillHints: const [AutofillHints.email],
+                                    validator: validateEmail,
+                                    onFieldSubmitted: (_) =>
+                                        _passwordFocus.requestFocus(),
+                                    decoration: InputDecoration(
+                                      labelText: 'Email',
+                                      hintText: 'you@example.com',
+                                      prefixIcon: Icon(
+                                        Icons.mail_outline_rounded,
                                         size: 22,
                                         color: muted,
                                       ),
-                                      onPressed: () => setState(
-                                        () => _obscure = !_obscure,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  TextFormField(
+                                    controller: _password,
+                                    focusNode: _passwordFocus,
+                                    obscureText: _obscure,
+                                    textInputAction: TextInputAction.done,
+                                    validator: (v) =>
+                                        validatePassword(v, minLength: 1),
+                                    onFieldSubmitted: (_) {
+                                      if (!_loading) _submit();
+                                    },
+                                    autofillHints: const [
+                                      AutofillHints.password,
+                                    ],
+                                    decoration: InputDecoration(
+                                      labelText: 'Password',
+                                      hintText: 'Your password',
+                                      prefixIcon: Icon(
+                                        Icons.lock_outline_rounded,
+                                        size: 22,
+                                        color: muted,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        tooltip: _obscure
+                                            ? 'Show password'
+                                            : 'Hide password',
+                                        icon: Icon(
+                                          _obscure
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                          size: 22,
+                                          color: muted,
+                                        ),
+                                        onPressed: () => setState(
+                                          () => _obscure = !_obscure,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 8,
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 8,
+                                        ),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        visualDensity: VisualDensity.compact,
                                       ),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    onPressed: () =>
-                                        context.push('/forgot-password'),
-                                    child: const Text(
-                                      'Forgot password?',
-                                      style: TextStyle(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w600,
+                                      onPressed: () =>
+                                          context.push('/forgot-password'),
+                                      child: const Text(
+                                        'Forgot password?',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                if (_formError != null) ...[
-                                  const SizedBox(height: 4),
-                                  _LoginErrorBanner(message: _formError!),
-                                  const SizedBox(height: 12),
-                                ] else
-                                  const SizedBox(height: 12),
-                                PrimaryButton(
-                                  label: 'Sign in',
-                                  loading: _loading,
-                                  onPressed: _submit,
-                                  icon: Icons.arrow_forward_rounded,
-                                ),
-                                const SizedBox(height: 18),
-                                const SocialAuthButtons(),
-                              ],
+                                  if (_formError != null) ...[
+                                    const SizedBox(height: 4),
+                                    _LoginErrorBanner(message: _formError!),
+                                    const SizedBox(height: 12),
+                                  ] else
+                                    const SizedBox(height: 12),
+                                  PrimaryButton(
+                                    label: 'Sign in',
+                                    loading: _loading,
+                                    onPressed: _submit,
+                                    icon: Icons.arrow_forward_rounded,
+                                  ),
+                                  const SizedBox(height: 18),
+                                  const SocialAuthButtons(),
+                                ],
+                              ),
                             ),
                           ),
                         ),

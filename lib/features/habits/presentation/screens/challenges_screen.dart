@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/module_cache.dart';
@@ -129,14 +130,6 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
     }).toList();
   }
 
-  static String _titleCase(String value) {
-    if (value.isEmpty) return value;
-    return value
-        .split(RegExp(r'[_\s]+'))
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -195,7 +188,7 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
                   ..._statuses.map(
                     (s) => VivrantFilterOption(
                       value: s,
-                      label: _titleCase(s),
+                      label: humanizeLabel(s),
                       count: _items
                           .where(
                             (c) => (c['status']?.toString() ?? 'active') == s,

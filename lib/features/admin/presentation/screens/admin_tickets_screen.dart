@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/module_cache.dart';
@@ -40,14 +41,6 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
   void dispose() {
     _query.dispose();
     super.dispose();
-  }
-
-  static String _titleCase(String value) {
-    if (value.isEmpty) return value;
-    return value
-        .split(RegExp(r'[_\s]+'))
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
   }
 
   List<String> get _statuses {
@@ -200,7 +193,7 @@ class _AdminTicketsScreenState extends ConsumerState<AdminTicketsScreen> {
                   ..._statuses.map(
                     (s) => VivrantFilterOption(
                       value: s,
-                      label: _titleCase(s),
+                      label: humanizeLabel(s),
                       count: _tickets
                           .where(
                             (t) => (t['status']?.toString() ?? 'open') == s,

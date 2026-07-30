@@ -237,17 +237,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       'No notifications match these filters. Try All or another search.',
                 )
               else
-                ...filtered.map(
-                  (n) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _NotificationCard(
-                      notification: n,
-                      ink: ink,
-                      muted: muted,
-                      dark: dark,
-                      onTap: () => _markRead(n),
-                    ),
-                  ),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final n = filtered[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _NotificationCard(
+                        notification: n,
+                        ink: ink,
+                        muted: muted,
+                        dark: dark,
+                        onTap: () => _markRead(n),
+                      ),
+                    );
+                  },
                 ),
             ],
           ],

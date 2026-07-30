@@ -94,6 +94,9 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       setState(() => _messages = updated);
     } catch (e) {
       if (!mounted) return;
+      // Restore the draft so a failed send does not lose the user's text.
+      _input.text = q;
+      _input.selection = TextSelection.collapsed(offset: q.length);
       context.showError(apiErrorMessage(e));
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -118,10 +121,12 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
+                    tooltip: 'Insights',
                     onPressed: () => context.push('/ai/insights'),
                     icon: const Icon(Icons.insights_outlined),
                   ),
                   IconButton(
+                    tooltip: 'Reminders',
                     onPressed: () => context.push('/ai/reminders'),
                     icon: const Icon(Icons.alarm_outlined),
                   ),
@@ -181,6 +186,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
+                  tooltip: 'Send',
                   onPressed: _sending ? null : _send,
                   icon: _sending
                       ? const SizedBox(

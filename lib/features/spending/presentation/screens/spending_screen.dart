@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -103,14 +104,6 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     }).toList();
   }
 
-  static String _titleCase(String value) {
-    if (value.isEmpty) return value;
-    return value
-        .split(RegExp(r'[_\s]+'))
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final spent = (_overview?['spent'] as num?)?.toDouble() ??
@@ -203,7 +196,7 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
                   ..._categories.map(
                     (c) => VivrantFilterOption(
                       value: c,
-                      label: _titleCase(c),
+                      label: humanizeLabel(c),
                       count: _expenses.where((e) => e.category == c).length,
                     ),
                   ),

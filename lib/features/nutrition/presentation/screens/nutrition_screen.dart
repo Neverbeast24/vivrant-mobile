@@ -120,6 +120,7 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
               title: 'Meals &',
               highlight: 'macros',
               trailing: IconButton(
+                tooltip: 'Log meal',
                 onPressed: () => context.push('/nutrition/log'),
                 icon: const Icon(Icons.add_circle_outline),
               ),

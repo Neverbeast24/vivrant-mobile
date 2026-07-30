@@ -310,6 +310,10 @@ String apiErrorMessage(Object error) {
     if (data is Map && data['error'] is String) {
       return data['error'] as String;
     }
+    if (data is Map && data['error'] is Map) {
+      final nested = data['error'] as Map;
+      if (nested['message'] is String) return nested['message'] as String;
+    }
     if (data is Map && data['message'] is String) {
       return data['message'] as String;
     }

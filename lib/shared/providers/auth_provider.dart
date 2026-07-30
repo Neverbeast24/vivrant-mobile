@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,6 +82,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     });
   }
 
+  /// Backfills the profile after a soft bootstrap failure (network blip).
+  /// Stops on success, on a 401 (handled by the session-expired path), or
+  /// once the user is no longer authenticated.
+  void _retryProfileInBackground() {
+    Future<void>(() async {
+      for (final delay in const [
+        Duration(seconds: 5),
+        Duration(seconds: 20),
+        Duration(seconds: 60),
+      ]) {
+        await Future<void>.delayed(delay);
+        if (!mounted) return;
+        if (state.status != AuthStatus.authenticated) return;
+        if (state.profile != null) return;
+        try {
+          final profile = await _api.getProfile();
+          if (!mounted || state.status != AuthStatus.authenticated) return;
+          state = state.copyWith(profile: profile);
+          return;
+        } catch (e) {
+          if (e is DioException && e.response?.statusCode == 401) return;
+        }
+      }
+    });
+  }
+
   Future<void> _bootstrap() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -101,12 +128,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
             .timeout(const Duration(seconds: 12));
         state = AuthState(status: AuthStatus.authenticated, profile: profile);
         _enqueuePushRegistration();
-      } catch (_) {
-        await _client.clearTokens();
-        state = AuthState(
-          status: AuthStatus.unauthenticated,
-          error: onboarded ? null : 'needs_onboarding',
-        );
+      } catch (e) {
+        // Only clear tokens on definitive auth failure. Network/timeouts
+        // should keep the session so a blip does not force re-login.
+        final unauthorized = e is DioException && e.response?.statusCode == 401;
+        if (unauthorized) {
+          await _client.clearTokens();
+          state = AuthState(
+            status: AuthStatus.unauthenticated,
+            error: onboarded ? null : 'needs_onboarding',
+          );
+          return;
+        }
+        if (kDebugMode) {
+          debugPrint('[vivrant:auth] bootstrap profile soft-fail: $e');
+        }
+        // Keep the session and fill the profile in once the network recovers.
+        state = const AuthState(status: AuthStatus.authenticated);
+        _enqueuePushRegistration();
+        _retryProfileInBackground();
       }
     } catch (_) {
       // Storage failures should still leave splash.
