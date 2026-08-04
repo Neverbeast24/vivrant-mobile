@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -49,7 +50,7 @@ class _SleepScreenState extends ConsumerState<SleepScreen> {
     try {
       final res = await ref.read(vivrantApiProvider).coachSleep();
       if (!mounted) return;
-      context.showInfo(res['advice']?.toString() ?? res.toString());
+      context.showInfo(formatAiResponse(res, keys: const ['advice', 'coaching', 'tip']));
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));

@@ -11,8 +11,12 @@ extension VivrantWellnessApi on VivrantApi {
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
-  Future<void> addHydration(int ml) async {
-    await _client.post('/api/mobile/hydration', data: {'ml': ml});
+  Future<Map<String, dynamic>> addHydration(int ml) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/hydration',
+      data: {'ml': ml},
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
   }
 
   Future<void> scheduleHydrationReminders() async {

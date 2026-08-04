@@ -14,15 +14,42 @@ class HydrationScreen extends ConsumerStatefulWidget {
 }
 
 class _HydrationScreenState extends ConsumerState<HydrationScreen> {
+  int _todayMl = 0;
   int _added = 0;
   bool _busy = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToday();
+  }
+
+  Future<void> _loadToday() async {
+    setState(() => _loading = true);
+    try {
+      final today = await ref.read(vivrantApiProvider).getToday();
+      if (!mounted) return;
+      setState(() {
+        _todayMl = (today['water_ml'] as num?)?.toInt() ?? 0;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
 
   Future<void> _add(int ml) async {
     setState(() => _busy = true);
     try {
-      await ref.read(vivrantApiProvider).addHydration(ml);
+      final res = await ref.read(vivrantApiProvider).addHydration(ml);
       if (!mounted) return;
-      setState(() => _added += ml);
+      final serverTotal = (res['water_ml'] as num?)?.toInt();
+      setState(() {
+        _added += ml;
+        _todayMl = serverTotal ?? (_todayMl + ml);
+      });
       context.showSuccess('Added $ml ml');
     } catch (e) {
       if (!mounted) return;
@@ -55,33 +82,42 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
             title: 'Stay',
             highlight: 'hydrated',
           ),
-          StatCard(
-            label: 'This session',
-            value: '$_added ml',
-            caption: 'logged from this screen',
-            icon: Icons.water_drop_outlined,
-          ),
-          const SizedBox(height: 18),
-          VivrantPanel(
-            title: 'Quick add',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final ml in [150, 250, 350, 500])
-                  ActionChip(
-                    label: Text('$ml ml'),
-                    onPressed: _busy ? null : () => _add(ml),
-                  ),
-              ],
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else ...[
+            StatCard(
+              label: 'Today',
+              value: '$_todayMl ml',
+              caption: _added > 0
+                  ? '+$_added ml this session'
+                  : 'total logged today',
+              icon: Icons.water_drop_outlined,
             ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _schedule,
-            icon: const Icon(Icons.notifications_active_outlined),
-            label: const Text('Schedule reminders'),
-          ),
+            const SizedBox(height: 18),
+            VivrantPanel(
+              title: 'Quick add',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final ml in [150, 250, 350, 500])
+                    ActionChip(
+                      label: Text('$ml ml'),
+                      onPressed: _busy ? null : () => _add(ml),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _schedule,
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: const Text('Schedule reminders'),
+            ),
+          ],
         ],
       ),
     );

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Runtime configuration for VIVRΛNT Mobile.
 ///
 /// Pass overrides with `--dart-define`:
@@ -13,12 +15,28 @@
 class Env {
   Env._();
 
+  static const _defaultApiBaseUrl = 'http://10.0.2.2:3000';
+
   /// Next.js / VIVRΛNT Web host that exposes the mobile REST API.
-  /// Defaults to Android emulator loopback to the host's viva-server.
-  static const apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000',
-  );
+  /// Defaults to Android emulator loopback in debug; release builds must
+  /// pass a production HTTPS URL via `--dart-define=API_BASE_URL=...`.
+  static String get apiBaseUrl {
+    const value = String.fromEnvironment(
+      'API_BASE_URL',
+      defaultValue: _defaultApiBaseUrl,
+    );
+    if (kReleaseMode) {
+      final isLoopback = value.contains('10.0.2.2') ||
+          value.contains('127.0.0.1') ||
+          value.contains('localhost');
+      if (isLoopback || !value.startsWith('https://')) {
+        throw StateError(
+          'Release builds require --dart-define=API_BASE_URL=https://your-production-host',
+        );
+      }
+    }
+    return value;
+  }
 
   /// Same Supabase project as viva-server (`NEXT_PUBLIC_SUPABASE_URL`).
   static const supabaseUrl = String.fromEnvironment(

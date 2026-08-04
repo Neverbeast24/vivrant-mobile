@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
@@ -150,7 +151,10 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
                       await ref.read(vivrantApiProvider).coachSpending();
                   if (!mounted) return;
                   context.showInfo(
-                    res['advice']?.toString() ?? res.toString(),
+                    formatAiResponse(
+                      res,
+                      keys: const ['advice', 'tip', 'suggestion'],
+                    ),
                   );
                 } catch (e) {
                   if (!mounted) return;

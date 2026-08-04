@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -23,9 +24,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       final res = await ref.read(vivrantApiProvider).generateInsight();
       if (!mounted) return;
       setState(() {
-        _insight = res['insight']?.toString() ??
-            res['summary']?.toString() ??
-            res.toString();
+        _insight = formatAiResponse(
+          res,
+          keys: const ['insight', 'summary', 'advice'],
+        );
       });
     } catch (e) {
       if (!mounted) return;

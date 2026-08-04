@@ -63,8 +63,8 @@ class ApiClient {
           final alreadyRetried =
               error.requestOptions.extra['_vivrantRetried'] == true;
           if (!alreadyRetried) {
-            final refreshed = await _refreshSession();
-            if (refreshed) {
+            final refreshOutcome = await _refreshSession();
+            if (refreshOutcome == _RefreshOutcome.success) {
               final opts = error.requestOptions;
               opts.extra['_vivrantRetried'] = true;
               final token = await _resolveAccessToken();
@@ -79,10 +79,14 @@ class ApiClient {
                 return handler.next(retryError);
               }
             }
+            // Network/timeout during refresh — keep tokens; surface the error.
+            if (refreshOutcome == _RefreshOutcome.transient) {
+              return handler.next(error);
+            }
           }
 
-          // Refresh failed or retry still 401 — clear only the token that
-          // failed (never wipe a newer session from a concurrent login).
+          // Refresh rejected (401/403) or retry still 401 — clear only the
+          // token that failed (never wipe a newer session from a concurrent login).
           final header =
               error.requestOptions.headers['Authorization']?.toString();
           if (header != null && header.toLowerCase().startsWith('bearer ')) {
@@ -139,7 +143,7 @@ class ApiClient {
   String? _memoryRefreshToken;
 
   /// Shared in-flight refresh so concurrent 401s only hit the endpoint once.
-  Future<bool>? _refreshInFlight;
+  Future<_RefreshOutcome>? _refreshInFlight;
 
   /// Called when a protected request gets 401 and the session was cleared.
   void Function()? onSessionExpired;
@@ -169,20 +173,19 @@ class ApiClient {
   }
 
   /// Exchange the stored refresh token for a new access token.
-  /// Returns true when new tokens were saved.
-  Future<bool> _refreshSession() {
+  Future<_RefreshOutcome> _refreshSession() {
     return _refreshInFlight ??= _doRefresh().whenComplete(() {
       _refreshInFlight = null;
     });
   }
 
-  Future<bool> _doRefresh() async {
+  Future<_RefreshOutcome> _doRefresh() async {
     final refresh = await _resolveRefreshToken();
     if (refresh == null || refresh.isEmpty) {
       if (kDebugMode) {
         debugPrint('[vivrant:api] refresh skipped — no refresh token');
       }
-      return false;
+      return _RefreshOutcome.invalid;
     }
 
     try {
@@ -208,7 +211,7 @@ class ApiClient {
         if (kDebugMode) {
           debugPrint('[vivrant:api] refresh response missing access_token');
         }
-        return false;
+        return _RefreshOutcome.invalid;
       }
       await saveTokens(
         accessToken: access,
@@ -217,12 +220,22 @@ class ApiClient {
       if (kDebugMode) {
         debugPrint('[vivrant:api] session refreshed');
       }
-      return true;
+      return _RefreshOutcome.success;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (kDebugMode) {
+        debugPrint('[vivrant:api] refresh failed status=$status: $e');
+      }
+      if (status == 401 || status == 403) {
+        return _RefreshOutcome.invalid;
+      }
+      // Timeouts / connection errors — keep session tokens.
+      return _RefreshOutcome.transient;
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[vivrant:api] refresh failed: $e');
       }
-      return false;
+      return _RefreshOutcome.transient;
     }
   }
 
@@ -357,3 +370,5 @@ String apiErrorMessage(Object error) {
   }
   return 'Something went wrong. Please try again.';
 }
+
+enum _RefreshOutcome { success, invalid, transient }

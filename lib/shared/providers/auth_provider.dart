@@ -131,8 +131,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } catch (e) {
         // Only clear tokens on definitive auth failure. Network/timeouts
         // should keep the session so a blip does not force re-login.
-        final unauthorized = e is DioException && e.response?.statusCode == 401;
-        if (unauthorized) {
+        final status = e is DioException ? e.response?.statusCode : null;
+        final hardAuthFail = status == 401 || status == 403;
+        if (hardAuthFail) {
           await _client.clearTokens();
           state = AuthState(
             status: AuthStatus.unauthenticated,

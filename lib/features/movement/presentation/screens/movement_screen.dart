@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -237,7 +238,10 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                       await ref.read(vivrantApiProvider).suggestWorkoutAi();
                   if (!mounted) return;
                   context.showInfo(
-                    res['suggestion']?.toString() ?? res.toString(),
+                    formatAiResponse(
+                      res,
+                      keys: const ['suggestion', 'advice', 'tip'],
+                    ),
                   );
                 } catch (e) {
                   if (!mounted) return;

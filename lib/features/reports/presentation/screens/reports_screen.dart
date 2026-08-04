@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -61,9 +62,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       final res = await ref.read(vivrantApiProvider).weeklyStory();
       if (!mounted) return;
       setState(() {
-        _story = res['story']?.toString() ??
-            res['summary']?.toString() ??
-            res.toString();
+        _story = formatAiResponse(
+          res,
+          keys: const ['story', 'summary', 'insight'],
+        );
       });
     } catch (e) {
       if (!mounted) return;

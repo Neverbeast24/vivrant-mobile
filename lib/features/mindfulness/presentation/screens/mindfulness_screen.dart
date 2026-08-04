@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -46,7 +47,7 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
     try {
       final res = await ref.read(vivrantApiProvider).coachMindfulness();
       if (!mounted) return;
-      context.showInfo(res['advice']?.toString() ?? res.toString());
+      context.showInfo(formatAiResponse(res, keys: const ['advice', 'tip', 'coaching']));
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));
