@@ -123,8 +123,93 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                   final res =
                       await ref.read(vivrantApiProvider).recommendMachinesAi();
                   if (!mounted) return;
-                  context.showInfo(
-                    res['summary']?.toString() ?? res.toString(),
+                  final recs = (res['recommendations'] as List? ?? const [])
+                      .whereType<Map>()
+                      .map((e) => Map<String, dynamic>.from(e))
+                      .toList()
+                    ..sort(
+                      (a, b) => ((a['priority'] as num?)?.toInt() ?? 99)
+                          .compareTo((b['priority'] as num?)?.toInt() ?? 99),
+                    );
+                  if (recs.isEmpty) {
+                    context.showInfo(
+                      res['summary']?.toString() ?? 'No recommendations yet.',
+                    );
+                    return;
+                  }
+                  await showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    showDragHandle: true,
+                    builder: (ctx) {
+                      return SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                res['title']?.toString() ?? 'AI machine picks',
+                                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                              if ((res['summary']?.toString() ?? '').isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  res['summary'].toString(),
+                                  style: Theme.of(ctx).textTheme.bodySmall,
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              Flexible(
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: recs.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 20),
+                                  itemBuilder: (_, index) {
+                                    final item = recs[index];
+                                    final slug = item['demo_slug']?.toString();
+                                    GymExercise? demo;
+                                    if (slug != null && slug.isNotEmpty) {
+                                      for (final ex in _exercises) {
+                                        if (ex.slug == slug) {
+                                          demo = ex;
+                                          break;
+                                        }
+                                      }
+                                    }
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        item['machine']?.toString() ?? 'Machine',
+                                        style: const TextStyle(fontWeight: FontWeight.w800),
+                                      ),
+                                      subtitle: Text(
+                                        [
+                                          if (item['why'] != null) item['why'].toString(),
+                                          if (item['sets'] != null) 'Sets: ${item['sets']}',
+                                        ].where((e) => e.isNotEmpty).join('\n'),
+                                      ),
+                                      trailing: demo != null && demo.hasDemo
+                                          ? TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(ctx);
+                                                showExerciseDemoSheet(context, demo!);
+                                              },
+                                              child: const Text('Demo'),
+                                            )
+                                          : null,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 } catch (e) {
                   if (!mounted) return;

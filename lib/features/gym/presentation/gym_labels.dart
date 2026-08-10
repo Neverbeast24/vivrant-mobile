@@ -1,8 +1,28 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/utils/humanize.dart';
+import '../../../shared/models/gym_exercise.dart';
 
 export '../../../core/utils/humanize.dart' show humanizeLabel;
+
+/// Mirrors web `GYM_AVOID_TARGETS` for AI gym plan prefs.
+const gymAvoidTargets = <String>[
+  'core',
+  'arms',
+  'forearms',
+  'shoulders',
+  'chest',
+  'back',
+  'traps',
+  'legs',
+  'glutes',
+  'hamstrings',
+  'calves',
+  'inner_thighs',
+  'lower_back',
+  'cardio',
+  'mobility',
+];
 
 String muscleFilterLabel(String value) {
   if (value == 'all') return 'All';
@@ -15,6 +35,35 @@ bool matchesMuscleFilter(String muscleGroup, String filter) {
   if (filter == 'all') return true;
   if (filter == 'legs') return legsMuscleGroups.contains(muscleGroup);
   return muscleGroup == filter;
+}
+
+/// Match an AI/plan exercise name to a catalog demo (exact, then loose contains).
+GymExercise? findExerciseMatch(String name, List<GymExercise> exercises) {
+  final needle = name.toLowerCase().trim();
+  if (needle.isEmpty) return null;
+  for (final item in exercises) {
+    if (item.name.toLowerCase() == needle) return item;
+  }
+  for (final item in exercises) {
+    final catalog = item.name.toLowerCase();
+    if (needle.contains(catalog) || catalog.contains(needle)) return item;
+  }
+  final stripped = needle
+      .replaceAll(RegExp(r'\b(machine|trainer|bike|climber)\b'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (stripped.isEmpty || stripped == needle) return null;
+  for (final item in exercises) {
+    final catalog = item.name.toLowerCase();
+    final catalogStripped = catalog
+        .replaceAll(RegExp(r'\b(machine|trainer)\b'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (catalog.contains(stripped) || stripped.contains(catalogStripped)) {
+      return item;
+    }
+  }
+  return null;
 }
 
 IconData muscleIcon(String muscleGroup) {

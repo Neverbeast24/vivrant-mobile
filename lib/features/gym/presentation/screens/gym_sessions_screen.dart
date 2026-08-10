@@ -7,6 +7,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
+import '../gym_labels.dart';
 
 class GymSessionsScreen extends ConsumerStatefulWidget {
   const GymSessionsScreen({super.key});
@@ -128,14 +129,6 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
     }).toList();
   }
 
-  static String _titleCase(String value) {
-    if (value.isEmpty) return value;
-    return value
-        .split(RegExp(r'[_\s]+'))
-        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
-        .join(' ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -188,7 +181,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                   ..._focuses.map(
                     (f) => VivrantFilterOption(
                       value: f,
-                      label: _titleCase(f),
+                      label: humanizeLabel(f),
                       count: _items.where((s) => s.focus == f).length,
                     ),
                   ),
@@ -220,7 +213,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${s.focus ?? 'session'} · ${s.durationMinutes ?? '—'} min',
+                                  '${humanizeLabel(s.focus ?? 'session')} · ${s.durationMinutes ?? '—'} min',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],

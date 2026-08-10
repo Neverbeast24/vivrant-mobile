@@ -38,9 +38,26 @@ extension VivrantGymApi on VivrantApi {
     await _client.delete('/api/mobile/gym/sessions/$id');
   }
 
-  Future<Map<String, dynamic>> createAiGymPlan() async {
-    final res =
-        await _client.post<Map<String, dynamic>>('/api/mobile/gym/plans/ai');
+  Future<Map<String, dynamic>> createAiGymPlan({
+    int? daysPerWeek,
+    int? sessionMinutes,
+    List<String>? knownMachineSlugs,
+    List<String>? knownCustomExercises,
+    List<String>? avoidTargets,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/gym/plans/ai',
+      data: {
+        if (daysPerWeek != null) 'days_per_week': daysPerWeek,
+        if (sessionMinutes != null) 'session_minutes': sessionMinutes,
+        if (knownMachineSlugs != null && knownMachineSlugs.isNotEmpty)
+          'known_machine_slugs': knownMachineSlugs,
+        if (knownCustomExercises != null && knownCustomExercises.isNotEmpty)
+          'known_custom_exercises': knownCustomExercises,
+        if (avoidTargets != null && avoidTargets.isNotEmpty)
+          'avoid_targets': avoidTargets,
+      },
+    );
     return Map<String, dynamic>.from(res.data ?? {});
   }
 

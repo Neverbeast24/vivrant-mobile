@@ -291,10 +291,24 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 | `GET` | `/api/mobile/gym/sessions` | list |
 | `POST` | `/api/mobile/gym/sessions` | `logGymSession` |
 | `DELETE` | `/api/mobile/gym/sessions/:id` | `deleteGymSession` |
-| `GET` | `/api/mobile/gym/plans` | list |
-| `POST` | `/api/mobile/gym/plans/ai` | `createAiGymPlan` |
+| `GET` | `/api/mobile/gym/plans` | list (includes `days[]`, `summary`, `level`) |
+| `POST` | `/api/mobile/gym/plans/ai` | `createAiGymPlan` — optional prefs body below |
 | `DELETE` | `/api/mobile/gym/plans/:id` | `deleteGymPlan` |
 | `POST` | `/api/mobile/gym/machines/recommend` | `recommendMachinesWithAi` |
+
+**POST AI plan prefs (optional)**
+
+```json
+{
+  "days_per_week": 3,
+  "session_minutes": 45,
+  "known_machine_slugs": ["leg-press", "stiff-leg-deadlift"],
+  "known_custom_exercises": ["Hip thrust"],
+  "avoid_targets": ["core", "lower_back"]
+}
+```
+
+`avoid_targets` allowlist: `core`, `arms`, `forearms`, `shoulders`, `chest`, `back`, `traps`, `legs`, `glutes`, `hamstrings`, `calves`, `inner_thighs`, `lower_back`, `cardio`, `mobility`.
 
 **POST session**
 
