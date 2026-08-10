@@ -200,7 +200,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${p['focus'] ?? 'plan'} · ${days ?? '—'} days/wk',
+                                  '${_titleCase(p['focus']?.toString() ?? 'plan')} · ${days ?? '—'} days/wk',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
