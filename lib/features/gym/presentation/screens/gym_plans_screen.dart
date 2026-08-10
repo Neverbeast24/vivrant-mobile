@@ -26,6 +26,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   static const _prefsAvoidKey = 'vivrant.gym.avoidTargets';
 
   final _query = TextEditingController();
+  final _knownQuery = TextEditingController();
   final _customCtrl = TextEditingController();
   final _daysCtrl = TextEditingController(text: '3');
   final _sessionCtrl = TextEditingController(text: '45');
@@ -41,6 +42,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   bool _generating = false;
   String? _error;
   String _filter = 'all';
+  String _knownMuscle = 'all';
 
   @override
   void initState() {
@@ -59,6 +61,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   @override
   void dispose() {
     _query.dispose();
+    _knownQuery.dispose();
     _customCtrl.dispose();
     _daysCtrl.dispose();
     _sessionCtrl.dispose();
@@ -68,28 +71,49 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   Future<void> _restorePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
+    final days = int.tryParse(prefs.getString(_prefsDaysKey) ?? '') ?? 3;
+    final session = int.tryParse(prefs.getString(_prefsSessionKey) ?? '') ?? 45;
     setState(() {
-      _daysCtrl.text = prefs.getString(_prefsDaysKey) ?? _daysCtrl.text;
-      _sessionCtrl.text = prefs.getString(_prefsSessionKey) ?? _sessionCtrl.text;
+      _daysCtrl.text = days.clamp(2, 6).toString();
+      _sessionCtrl.text = session.clamp(15, 120).toString();
       _knownSlugs
         ..clear()
-        ..addAll(prefs.getStringList(_prefsKnownKey) ?? const []);
+        ..addAll(sanitizeKnownMachineSlugs(prefs.getStringList(_prefsKnownKey) ?? const []));
       _customExercises
         ..clear()
-        ..addAll(prefs.getStringList(_prefsCustomKey) ?? const []);
+        ..addAll(sanitizeCustomExercises(prefs.getStringList(_prefsCustomKey) ?? const []));
       _avoidTargets
         ..clear()
-        ..addAll(prefs.getStringList(_prefsAvoidKey) ?? const []);
+        ..addAll(sanitizeAvoidTargets(prefs.getStringList(_prefsAvoidKey) ?? const []));
     });
   }
 
   Future<void> _persistPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsDaysKey, _daysCtrl.text.trim());
-    await prefs.setString(_prefsSessionKey, _sessionCtrl.text.trim());
-    await prefs.setStringList(_prefsKnownKey, _knownSlugs.toList());
-    await prefs.setStringList(_prefsCustomKey, List<String>.from(_customExercises));
-    await prefs.setStringList(_prefsAvoidKey, _avoidTargets.toList());
+    final known = sanitizeKnownMachineSlugs(_knownSlugs);
+    final customs = sanitizeCustomExercises(_customExercises);
+    final avoids = sanitizeAvoidTargets(_avoidTargets);
+    if (!mounted) return;
+    if (known.length != _knownSlugs.length ||
+        customs.length != _customExercises.length ||
+        avoids.length != _avoidTargets.length) {
+      setState(() {
+        _knownSlugs
+          ..clear()
+          ..addAll(known);
+        _customExercises
+          ..clear()
+          ..addAll(customs);
+        _avoidTargets
+          ..clear()
+          ..addAll(avoids);
+      });
+    }
+    await prefs.setString(_prefsDaysKey, _daysPerWeek.toString());
+    await prefs.setString(_prefsSessionKey, _sessionMinutes.toString());
+    await prefs.setStringList(_prefsKnownKey, known);
+    await prefs.setStringList(_prefsCustomKey, customs);
+    await prefs.setStringList(_prefsAvoidKey, avoids);
   }
 
   Future<void> _load() async {
@@ -153,10 +177,11 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   }
 
   void _addCustom() {
-    final name = _customCtrl.text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (name.length < 2) return;
+    final cleaned = sanitizeCustomExercises([_customCtrl.text]);
+    if (cleaned.isEmpty) return;
+    final name = cleaned.first;
     final exists = _customExercises.any((e) => e.toLowerCase() == name.toLowerCase());
-    if (exists) {
+    if (exists || _customExercises.length >= 20) {
       _customCtrl.clear();
       return;
     }
@@ -165,6 +190,63 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       _customCtrl.clear();
     });
     _persistPrefs();
+  }
+
+  void _toggleKnown(String slug) {
+    final cleaned = sanitizeKnownMachineSlugs([slug]);
+    if (cleaned.isEmpty) return;
+    final key = cleaned.first;
+    setState(() {
+      if (_knownSlugs.contains(key)) {
+        _knownSlugs.remove(key);
+      } else if (_knownSlugs.length < 60) {
+        _knownSlugs.add(key);
+      }
+    });
+    _persistPrefs();
+  }
+
+  void _clearKnown() {
+    setState(() {
+      _knownSlugs.clear();
+      _customExercises.clear();
+    });
+    _persistPrefs();
+  }
+
+  void _toggleSelectAllKnownInView() {
+    final visible = _visibleKnownExercises.map((e) => e.slug).toList(growable: false);
+    if (visible.isEmpty) return;
+    final allSelected = visible.every(_knownSlugs.contains);
+    setState(() {
+      if (allSelected) {
+        _knownSlugs.removeAll(visible);
+      } else {
+        for (final slug in visible) {
+          if (_knownSlugs.length >= 60) break;
+          _knownSlugs.add(slug);
+        }
+      }
+    });
+    _persistPrefs();
+  }
+
+  bool _matchesKnownSearch(GymExercise exercise, String q) {
+    if (q.isEmpty) return true;
+    return exercise.name.toLowerCase().contains(q) ||
+        exercise.muscleGroup.toLowerCase().contains(q) ||
+        exercise.equipment.toLowerCase().contains(q);
+  }
+
+  List<GymExercise> _filterKnownList(List<GymExercise> source) {
+    final q = _knownQuery.text.trim().toLowerCase();
+    return source
+        .where(
+          (exercise) =>
+              matchesMuscleFilter(exercise.muscleGroup, _knownMuscle) &&
+              _matchesKnownSearch(exercise, q),
+        )
+        .toList(growable: false);
   }
 
   List<String> get _focuses {
@@ -193,6 +275,18 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
 
   List<GymExercise> get _freeWeights =>
       _exercises.where((e) => !e.isMachine).toList(growable: false);
+
+  List<GymExercise> get _filteredMachines => _filterKnownList(_machines);
+
+  List<GymExercise> get _filteredFreeWeights => _filterKnownList(_freeWeights);
+
+  List<GymExercise> get _visibleKnownExercises =>
+      [..._filteredMachines, ..._filteredFreeWeights];
+
+  bool get _allVisibleKnownSelected {
+    final visible = _visibleKnownExercises;
+    return visible.isNotEmpty && visible.every((e) => _knownSlugs.contains(e.slug));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +330,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Synced with web: days, session length, avoid targets, known exercises, and custom moves.',
+                    'Same options as web: days, session length, avoid targets, known exercises, and custom moves. Choices stay on this device.',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
@@ -305,41 +399,75 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${_knownSlugs.length + _customExercises.length} selected · includes stiff-leg deadlift under free weights',
+                    'Search or filter by muscle, then Select all in view — AI plans prioritize your list.',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Chip(
+                        label: Text(
+                          '${_knownSlugs.length + _customExercises.length} selected',
+                        ),
+                      ),
+                      if (_visibleKnownExercises.isNotEmpty)
+                        TextButton(
+                          onPressed: _toggleSelectAllKnownInView,
+                          child: Text(
+                            _allVisibleKnownSelected
+                                ? 'Deselect in view'
+                                : 'Select all in view (${_visibleKnownExercises.length})',
+                          ),
+                        ),
+                      if (_knownSlugs.isNotEmpty || _customExercises.isNotEmpty)
+                        TextButton(
+                          onPressed: _clearKnown,
+                          child: const Text('Clear all'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  VivrantSearchField(
+                    controller: _knownQuery,
+                    hintText: 'Search exercises…',
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  VivrantFilterChips<String>(
+                    options: [
+                      for (final muscle in gymMuscleFilters)
+                        VivrantFilterOption(
+                          value: muscle,
+                          label: muscleFilterLabel(muscle),
+                        ),
+                    ],
+                    selected: _knownMuscle,
+                    onSelected: (v) => setState(() => _knownMuscle = v),
+                  ),
+                  const SizedBox(height: 10),
                   _ExerciseChecklist(
-                    title: 'Machines',
-                    exercises: _machines,
+                    title: 'Machines (${_filteredMachines.length})',
+                    exercises: _filteredMachines,
+                    emptyMessage: _machines.isEmpty
+                        ? 'No machines in the catalog yet.'
+                        : 'No machines match this search or muscle filter.',
                     selected: _knownSlugs,
-                    onToggle: (slug) {
-                      setState(() {
-                        if (_knownSlugs.contains(slug)) {
-                          _knownSlugs.remove(slug);
-                        } else {
-                          _knownSlugs.add(slug);
-                        }
-                      });
-                      _persistPrefs();
-                    },
+                    onToggle: _toggleKnown,
                     onDemo: (ex) => showExerciseDemoSheet(context, ex),
                   ),
                   const SizedBox(height: 10),
                   _ExerciseChecklist(
-                    title: 'Free weights & bodyweight',
-                    exercises: _freeWeights,
+                    title:
+                        'Free weights & bodyweight (${_filteredFreeWeights.length})',
+                    exercises: _filteredFreeWeights,
+                    emptyMessage: _freeWeights.isEmpty
+                        ? 'No free-weight moves in the catalog yet.'
+                        : 'No free-weight moves match this search or muscle filter.',
                     selected: _knownSlugs,
-                    onToggle: (slug) {
-                      setState(() {
-                        if (_knownSlugs.contains(slug)) {
-                          _knownSlugs.remove(slug);
-                        } else {
-                          _knownSlugs.add(slug);
-                        }
-                      });
-                      _persistPrefs();
-                    },
+                    onToggle: _toggleKnown,
                     onDemo: (ex) => showExerciseDemoSheet(context, ex),
                   ),
                   const SizedBox(height: 10),
@@ -501,6 +629,7 @@ class _ExerciseChecklist extends StatelessWidget {
   const _ExerciseChecklist({
     required this.title,
     required this.exercises,
+    required this.emptyMessage,
     required this.selected,
     required this.onToggle,
     required this.onDemo,
@@ -508,6 +637,7 @@ class _ExerciseChecklist extends StatelessWidget {
 
   final String title;
   final List<GymExercise> exercises;
+  final String emptyMessage;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
   final ValueChanged<GymExercise> onDemo;
@@ -524,36 +654,45 @@ class _ExerciseChecklist extends StatelessWidget {
               ),
         ),
         const SizedBox(height: 6),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 180),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: exercises.length,
-            itemBuilder: (context, index) {
-              final ex = exercises[index];
-              final checked = selected.contains(ex.slug);
-              return CheckboxListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                value: checked,
-                onChanged: (_) => onToggle(ex.slug),
-                title: Text(ex.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                  '${humanizeLabel(ex.muscleGroup)} · ${humanizeLabel(ex.equipment)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                secondary: ex.hasDemo
-                    ? IconButton(
-                        tooltip: 'Demo',
-                        onPressed: () => onDemo(ex),
-                        icon: const Icon(Icons.play_circle_outline),
-                      )
-                    : null,
-              );
-            },
+        if (exercises.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              emptyMessage,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          )
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: exercises.length,
+              itemBuilder: (context, index) {
+                final ex = exercises[index];
+                final checked = selected.contains(ex.slug);
+                return CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: checked,
+                  onChanged: (_) => onToggle(ex.slug),
+                  title: Text(ex.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                    '${humanizeLabel(ex.muscleGroup)} · ${humanizeLabel(ex.equipment)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  secondary: ex.hasDemo
+                      ? IconButton(
+                          tooltip: 'Demo',
+                          onPressed: () => onDemo(ex),
+                          icon: const Icon(Icons.play_circle_outline),
+                        )
+                      : null,
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }

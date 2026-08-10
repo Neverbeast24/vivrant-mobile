@@ -24,9 +24,85 @@ const gymAvoidTargets = <String>[
   'mobility',
 ];
 
+/// Mirrors web `muscleFilters` for gym catalog filtering.
+const gymMuscleFilters = <String>[
+  'all',
+  'legs',
+  'inner_thighs',
+  'calves',
+  'glutes',
+  'hamstrings',
+  'chest',
+  'back',
+  'shoulders',
+  'traps',
+  'arms',
+  'forearms',
+  'core',
+  'lower_back',
+  'full_body',
+  'cardio',
+  'mobility',
+];
+
 String muscleFilterLabel(String value) {
-  if (value == 'all') return 'All';
-  return humanizeLabel(value);
+  switch (value) {
+    case 'all':
+      return 'All muscles';
+    case 'lower_back':
+      return 'Lower back';
+    case 'full_body':
+      return 'Full body';
+    case 'inner_thighs':
+      return 'Inner thighs';
+    default:
+      return humanizeLabel(value);
+  }
+}
+
+/// Mirrors web `clampGymPlanPrefs` sanitize rules for known catalog slugs.
+List<String> sanitizeKnownMachineSlugs(Iterable<String> input) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final raw in input) {
+    final slug = raw.trim().toLowerCase();
+    if (slug.isEmpty || slug.length > 80 || seen.contains(slug)) continue;
+    seen.add(slug);
+    out.add(slug);
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
+/// Mirrors web sanitize for free-text custom exercises (max 20, ≤80 chars).
+List<String> sanitizeCustomExercises(Iterable<String> input) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final raw in input) {
+    final name = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (name.length < 2) continue;
+    final clipped = name.length > 80 ? name.substring(0, 80) : name;
+    final key = clipped.toLowerCase();
+    if (seen.contains(key)) continue;
+    seen.add(key);
+    out.add(clipped);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
+/// Mirrors web sanitize for avoid targets (allowlist only).
+List<String> sanitizeAvoidTargets(Iterable<String> input) {
+  final allow = gymAvoidTargets.toSet();
+  final seen = <String>{};
+  final out = <String>[];
+  for (final raw in input) {
+    final target = raw.trim().toLowerCase().replaceAll(' ', '_');
+    if (!allow.contains(target) || seen.contains(target)) continue;
+    seen.add(target);
+    out.add(target);
+  }
+  return out;
 }
 
 const legsMuscleGroups = {'legs', 'hamstrings', 'calves', 'inner_thighs'};
