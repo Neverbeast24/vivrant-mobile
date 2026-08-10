@@ -7,10 +7,18 @@ import '../../config/env.dart';
 
 const _tokenKey = 'vivrant_access_token';
 const _refreshKey = 'vivrant_refresh_token';
+const _sessionStartedKey = 'vivrant_session_started_at';
+
+/// Absolute session lifetime before the user must sign in again.
+/// Silent token refresh does not extend this window.
+const sessionMaxAge = Duration(minutes: 15);
 
 final secureStorageProvider = Provider<FlutterSecureStorage>(
   (_) => const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
   ),
 );
 
@@ -41,6 +49,33 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          final path = options.path;
+          final isAuthEndpoint = path.contains('/api/auth/login') ||
+              path.contains('/api/auth/signup') ||
+              path.contains('/api/auth/forgot-password') ||
+              path.contains('/api/mobile/auth/refresh');
+
+          if (!isAuthEndpoint) {
+            await loadSessionClock();
+            if (isSessionExpired) {
+              if (kDebugMode) {
+                debugPrint(
+                  '[vivrant:api] blocked expired session → ${options.method} $path',
+                );
+              }
+              await clearTokens();
+              onSessionExpired?.call();
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.cancel,
+                  error: 'session_expired',
+                  message: 'Session expired. Please sign in again.',
+                ),
+              );
+            }
+          }
+
           final token = await _resolveAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -120,13 +155,14 @@ class ApiClient {
             handler.next(response);
           },
           onError: (error, handler) {
-            final data = error.response?.data;
             final hasAuth =
                 error.requestOptions.headers['Authorization'] != null;
+            final status = error.response?.statusCode;
+            // Never log response bodies — they can include tokens / PII.
             debugPrint(
-              '[vivrant:api] ✖ ${error.response?.statusCode ?? 'no-status'} '
+              '[vivrant:api] ✖ ${status ?? 'no-status'} '
               '${error.requestOptions.uri} auth=$hasAuth '
-              'msg=${error.message} body=$data',
+              'type=${error.type.name}',
             );
             handler.next(error);
           },
@@ -141,12 +177,30 @@ class ApiClient {
   /// In-memory copy so requests keep working even if secure-storage races.
   String? _memoryAccessToken;
   String? _memoryRefreshToken;
+  DateTime? _memorySessionStartedAt;
 
   /// Shared in-flight refresh so concurrent 401s only hit the endpoint once.
   Future<_RefreshOutcome>? _refreshInFlight;
 
   /// Called when a protected request gets 401 and the session was cleared.
   void Function()? onSessionExpired;
+
+  /// UTC timestamp when the current login session began (null if logged out).
+  DateTime? get sessionStartedAt => _memorySessionStartedAt;
+
+  /// Remaining time until forced re-login, or [Duration.zero] if already due.
+  Duration get sessionTimeRemaining {
+    final started = _memorySessionStartedAt;
+    if (started == null) return Duration.zero;
+    final remaining = sessionMaxAge - DateTime.now().toUtc().difference(started);
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  bool get isSessionExpired {
+    final started = _memorySessionStartedAt;
+    if (started == null) return false;
+    return DateTime.now().toUtc().difference(started) >= sessionMaxAge;
+  }
 
   Dio get dio => _dio;
 
@@ -180,6 +234,17 @@ class ApiClient {
   }
 
   Future<_RefreshOutcome> _doRefresh() async {
+    await loadSessionClock();
+    if (isSessionExpired) {
+      if (kDebugMode) {
+        debugPrint(
+          '[vivrant:api] refresh blocked — session older than $sessionMaxAge',
+        );
+      }
+      // Leave clearing to the 401 interceptor so onSessionExpired still fires.
+      return _RefreshOutcome.invalid;
+    }
+
     final refresh = await _resolveRefreshToken();
     if (refresh == null || refresh.isEmpty) {
       if (kDebugMode) {
@@ -242,6 +307,7 @@ class ApiClient {
   Future<void> saveTokens({
     required String accessToken,
     String? refreshToken,
+    bool startNewSession = false,
   }) async {
     _memoryAccessToken = accessToken;
     if (refreshToken != null) {
@@ -251,15 +317,46 @@ class ApiClient {
     if (refreshToken != null) {
       await _storage.write(key: _refreshKey, value: refreshToken);
     }
+    if (startNewSession) {
+      await _writeSessionStart(DateTime.now().toUtc());
+    }
     if (kDebugMode) {
       debugPrint(
         '[vivrant:api] tokens saved accessLen=${accessToken.length} '
-        'refresh=${refreshToken != null}',
+        'refresh=${refreshToken != null} newSession=$startNewSession',
       );
     }
   }
 
   Future<String?> get accessToken => _resolveAccessToken();
+
+  /// Loads (or migrates) the session-start clock from secure storage.
+  /// Existing installs without a stamp get a fresh clock so they are not
+  /// logged out immediately after upgrading.
+  Future<void> loadSessionClock() async {
+    if (_memorySessionStartedAt != null) return;
+    final raw = await _storage.read(key: _sessionStartedKey);
+    if (raw != null && raw.isNotEmpty) {
+      final millis = int.tryParse(raw);
+      if (millis != null) {
+        _memorySessionStartedAt =
+            DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+        return;
+      }
+    }
+    final token = await _resolveAccessToken();
+    if (token != null && token.isNotEmpty) {
+      await _writeSessionStart(DateTime.now().toUtc());
+    }
+  }
+
+  Future<void> _writeSessionStart(DateTime startedAt) async {
+    _memorySessionStartedAt = startedAt;
+    await _storage.write(
+      key: _sessionStartedKey,
+      value: startedAt.millisecondsSinceEpoch.toString(),
+    );
+  }
 
   /// Clears stored JWTs. When [onlyIfAccessToken] is set, clears only if the
   /// current access token still matches (avoids wiping a fresher login).
@@ -271,8 +368,10 @@ class ApiClient {
     }
     _memoryAccessToken = null;
     _memoryRefreshToken = null;
+    _memorySessionStartedAt = null;
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshKey);
+    await _storage.delete(key: _sessionStartedKey);
     return true;
   }
 

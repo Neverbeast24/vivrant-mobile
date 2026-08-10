@@ -27,9 +27,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       label: 'Nutrition',
     ),
     FloatingNavDestination(
-      icon: Icons.directions_run_outlined,
-      selectedIcon: Icons.directions_run_rounded,
-      label: 'Move',
+      icon: Icons.fitness_center_outlined,
+      selectedIcon: Icons.fitness_center_rounded,
+      label: 'Training',
     ),
     FloatingNavDestination(
       icon: Icons.auto_awesome_outlined,

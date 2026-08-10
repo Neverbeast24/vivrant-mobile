@@ -10,6 +10,7 @@ import '../features/gym/gym.dart';
 import '../features/habits/habits.dart';
 import '../features/hydration/hydration.dart';
 import '../features/journal/journal.dart';
+import '../features/kitchen/presentation/screens/kitchen_hub_screen.dart';
 import '../features/mindfulness/mindfulness.dart';
 import '../features/movement/movement.dart';
 import '../features/notifications/notifications.dart';
@@ -23,6 +24,8 @@ import '../features/sleep/sleep.dart';
 import '../features/spending/spending.dart';
 import '../features/support/support.dart';
 import '../features/today/today.dart';
+import '../features/training/presentation/screens/training_hub_screen.dart';
+import '../features/wellness/presentation/screens/wellness_hub_screen.dart';
 import '../shared/providers/auth_provider.dart';
 import 'shell/app_shell.dart';
 import 'shell/more_menu_screen.dart';
@@ -79,6 +82,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (needsSuper && !_isSuperAdminRole(role)) return '/admin';
       }
 
+      // Legacy aliases after Training / Wellness / Kitchen merge.
+      if (loc == '/movement') return '/move/activity';
+      if (loc == '/training') return '/move';
+
       return null;
     },
     routes: [
@@ -113,8 +120,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(
               path: '/move',
-              builder: (_, __) => const MovementScreen(),
+              builder: (_, __) => const TrainingHubScreen(),
               routes: [
+                GoRoute(
+                  path: 'activity',
+                  builder: (_, __) => const MovementScreen(),
+                ),
                 GoRoute(
                   path: 'log',
                   builder: (_, __) => const LogWorkoutScreen(),
@@ -133,6 +144,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           ]),
         ],
       ),
+      GoRoute(path: '/wellness', builder: (_, __) => const WellnessHubScreen()),
+      GoRoute(path: '/kitchen', builder: (_, __) => const KitchenHubScreen()),
       GoRoute(path: '/gym', builder: (_, __) => const GymOverviewScreen()),
       GoRoute(path: '/gym/demos', builder: (_, __) => const GymDemosScreen()),
       GoRoute(path: '/gym/machines', builder: (_, __) => const GymMachinesScreen()),

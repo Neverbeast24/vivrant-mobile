@@ -15,7 +15,11 @@ extension VivrantAuthApi on VivrantApi {
     final refresh = data['refresh_token'] as String? ??
         data['session']?['refresh_token'] as String?;
     if (access != null) {
-      await _client.saveTokens(accessToken: access, refreshToken: refresh);
+      await _client.saveTokens(
+        accessToken: access,
+        refreshToken: refresh,
+        startNewSession: true,
+      );
     }
     return data;
   }

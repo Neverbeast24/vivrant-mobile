@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -47,6 +48,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       : _push = PushService(_api),
         super(const AuthState(status: AuthStatus.unknown)) {
     _client.onSessionExpired = _handleSessionExpired;
+    _lifecycleObserver = _AppLifecycleObserver(_checkSessionTimeout);
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _bootstrap();
   }
 
@@ -54,6 +57,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _client;
   final ModuleCache _moduleCache;
   final PushService _push;
+  late final _AppLifecycleObserver _lifecycleObserver;
+  Timer? _sessionTimer;
+
+  @override
+  void dispose() {
+    _sessionTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    super.dispose();
+  }
 
   void _enqueuePushRegistration() {
     // Fire-and-forget; never block or fail auth on push setup.
@@ -68,17 +80,77 @@ class AuthNotifier extends StateNotifier<AuthState> {
     });
   }
 
-  void _handleSessionExpired() {
+  void _armSessionTimer() {
+    _sessionTimer?.cancel();
+    if (state.status != AuthStatus.authenticated) return;
+    final remaining = _client.sessionTimeRemaining;
+    if (remaining <= Duration.zero) {
+      unawaited(_expireSession());
+      return;
+    }
+    if (kDebugMode) {
+      debugPrint(
+        '[vivrant:auth] session timer armed for ${remaining.inMinutes}m '
+        '${remaining.inSeconds % 60}s',
+      );
+    }
+    _sessionTimer = Timer(remaining, () {
+      unawaited(_expireSession());
+    });
+  }
+
+  Future<void> _checkSessionTimeout() async {
+    if (state.status != AuthStatus.authenticated) return;
+    await _client.loadSessionClock();
+    if (_client.isSessionExpired) {
+      await _expireSession();
+      return;
+    }
+    _armSessionTimer();
+  }
+
+  Future<void> _expireSession() async {
+    if (state.status != AuthStatus.authenticated) return;
+    if (kDebugMode) {
+      debugPrint('[vivrant:auth] absolute session timeout — forcing re-login');
+    }
+    _sessionTimer?.cancel();
+    await _client.clearTokens();
+    try {
+      if (await ensureSupabaseInitialized()) {
+        await Supabase.instance.client.auth.signOut();
+      }
+    } catch (_) {
+      // Local tokens already cleared.
+    }
+    _handleSessionExpired(
+      message: 'Your session expired. Please sign in again.',
+    );
+  }
+
+  void _handleSessionExpired({String? message}) {
     if (state.status != AuthStatus.authenticated) return;
     if (kDebugMode) {
       debugPrint('[vivrant:auth] session expired — forcing re-login');
     }
+    _sessionTimer?.cancel();
+    // Tear down any Supabase OAuth session as well (best-effort).
+    unawaited(() async {
+      try {
+        if (await ensureSupabaseInitialized()) {
+          await Supabase.instance.client.auth.signOut();
+        }
+      } catch (_) {}
+    }());
     // Defer so GoRouter redirect does not tear down overlays mid-frame
     // (Duplicate GlobalKey / dirty build-scope crashes).
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (state.status != AuthStatus.authenticated) return;
       _moduleCache.invalidate();
-      state = const AuthState(status: AuthStatus.unauthenticated);
+      state = AuthState(
+        status: AuthStatus.unauthenticated,
+        error: message,
+      );
     });
   }
 
@@ -122,11 +194,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return;
       }
 
+      await _client.loadSessionClock();
+      if (_client.isSessionExpired) {
+        await _client.clearTokens();
+        state = AuthState(
+          status: AuthStatus.unauthenticated,
+          error: onboarded
+              ? 'Your session expired. Please sign in again.'
+              : 'needs_onboarding',
+        );
+        return;
+      }
+
       try {
         final profile = await _api
             .getProfile()
             .timeout(const Duration(seconds: 12));
         state = AuthState(status: AuthStatus.authenticated, profile: profile);
+        _armSessionTimer();
         _enqueuePushRegistration();
       } catch (e) {
         // Only clear tokens on definitive auth failure. Network/timeouts
@@ -146,6 +231,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
         // Keep the session and fill the profile in once the network recovers.
         state = const AuthState(status: AuthStatus.authenticated);
+        _armSessionTimer();
         _enqueuePushRegistration();
         _retryProfileInBackground();
       }
@@ -161,7 +247,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> login(String email, String password) async {
     state = state.copyWith(clearError: true);
     if (kDebugMode) {
-      debugPrint('[vivrant:auth] login start email=$email');
+      debugPrint('[vivrant:auth] login start');
     }
     try {
       final data = await _api.login(email: email, password: password);
@@ -176,26 +262,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Prefer profile from login response — avoids a second round-trip.
       final profile = _profileFromAuthPayload(data) ?? await _api.getProfile();
       if (kDebugMode) {
-        debugPrint(
-          '[vivrant:auth] login ok user=${profile.displayName} email=${profile.email}',
-        );
+        debugPrint('[vivrant:auth] login ok');
       }
       state = AuthState(status: AuthStatus.authenticated, profile: profile);
-    } catch (e, st) {
+      _armSessionTimer();
+    } catch (e) {
       // StateNotifier applies state before notifying listeners. If a listener
       // throws (e.g. GoRouter refresh), auth is already set — keep the session.
       if (state.status == AuthStatus.authenticated) {
         if (kDebugMode) {
           debugPrint(
-            '[vivrant:auth] login ok (ignored listener error): $e\n$st',
+            '[vivrant:auth] login ok (ignored listener error)',
           );
         }
+        _armSessionTimer();
         _enqueuePushRegistration();
         return true;
       }
       final message = apiErrorMessage(e);
       if (kDebugMode) {
-        debugPrint('[vivrant:auth] login fail: $message\n$e\n$st');
+        debugPrint('[vivrant:auth] login fail: $message');
       }
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
@@ -257,23 +343,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
           await _client.saveTokens(
             accessToken: session.accessToken,
             refreshToken: session.refreshToken,
+            startNewSession: true,
           );
           final profile = await _api.getProfile();
           state = AuthState(status: AuthStatus.authenticated, profile: profile);
+          _armSessionTimer();
           _enqueuePushRegistration();
           if (kDebugMode) {
-            debugPrint(
-              '[vivrant:auth] oauth ok provider=$provider email=${profile.email}',
-            );
+            debugPrint('[vivrant:auth] oauth ok provider=$provider');
           }
           completer.complete(true);
-        } catch (e, st) {
+        } catch (e) {
           if (state.status == AuthStatus.authenticated) {
             if (kDebugMode) {
               debugPrint(
-                '[vivrant:auth] oauth ok (ignored listener error): $e\n$st',
+                '[vivrant:auth] oauth ok (ignored listener error)',
               );
             }
+            _armSessionTimer();
             _enqueuePushRegistration();
             if (!completer.isCompleted) completer.complete(true);
             return;
@@ -344,6 +431,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await _api.login(email: email, password: password);
         final profile = await _api.getProfile();
         state = AuthState(status: AuthStatus.authenticated, profile: profile);
+        _armSessionTimer();
         _enqueuePushRegistration();
       } catch (_) {
         state = const AuthState(
@@ -359,6 +447,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    _sessionTimer?.cancel();
     await _push.unregister();
     await _api.logout();
     try {
@@ -382,6 +471,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> refreshProfile([Profile? profile]) async {
     final next = profile ?? await _api.getProfile();
     state = state.copyWith(profile: next);
+  }
+}
+
+class _AppLifecycleObserver with WidgetsBindingObserver {
+  _AppLifecycleObserver(this._onResumed);
+
+  final Future<void> Function() _onResumed;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_onResumed());
+    }
   }
 }
 

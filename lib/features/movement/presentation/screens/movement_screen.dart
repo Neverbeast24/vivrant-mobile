@@ -38,7 +38,17 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _items = List<WorkoutLog>.from(cached);
       _loading = false;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeActivate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Load when this is the Training tab, or when pushed as /move/activity.
+      if (ref.read(shellTabIndexProvider) == _tabIndex ||
+          GoRouter.of(context).canPop()) {
+        _activated = true;
+        _load();
+      } else {
+        _maybeActivate();
+      }
+    });
   }
 
   @override
@@ -113,12 +123,22 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
             PageHeader(
-              eyebrow: 'Movement',
-              title: 'Activity',
-              highlight: 'pulse',
-              trailing: IconButton(
-                onPressed: () => context.push('/move/log'),
-                icon: const Icon(Icons.add_circle_outline),
+              eyebrow: 'Training',
+              title: 'Daily',
+              highlight: 'activity',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (GoRouter.of(context).canPop())
+                    IconButton(
+                      onPressed: () => context.pop(),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                  IconButton(
+                    onPressed: () => context.push('/move/log'),
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ],
               ),
             ),
             StatCard(

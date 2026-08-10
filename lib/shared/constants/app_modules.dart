@@ -37,30 +37,16 @@ enum ModuleGroup {
 const appModules = <AppModule>[
   AppModule(
     icon: Icons.fitness_center,
-    label: 'Gym',
-    caption: 'Demos & sessions',
-    path: '/gym',
+    label: 'Training',
+    caption: 'Activity & gym',
+    path: '/move',
     group: ModuleGroup.training,
   ),
   AppModule(
-    icon: Icons.nightlight_round,
-    label: 'Sleep',
-    caption: 'Rest & recovery',
-    path: '/sleep',
-    group: ModuleGroup.wellness,
-  ),
-  AppModule(
-    icon: Icons.water_drop_outlined,
-    label: 'Hydration',
-    caption: 'Water goals',
-    path: '/hydration',
-    group: ModuleGroup.wellness,
-  ),
-  AppModule(
-    icon: Icons.air,
-    label: 'Mindfulness',
-    caption: 'Mood & calm',
-    path: '/mindfulness',
+    icon: Icons.favorite_outline,
+    label: 'Wellness',
+    caption: 'Sleep, water, mood',
+    path: '/wellness',
     group: ModuleGroup.wellness,
   ),
   AppModule(
@@ -78,17 +64,10 @@ const appModules = <AppModule>[
     group: ModuleGroup.wellness,
   ),
   AppModule(
-    icon: Icons.shopping_basket_outlined,
-    label: 'Groceries',
-    caption: 'Smart shopping list',
-    path: '/groceries',
-    group: ModuleGroup.household,
-  ),
-  AppModule(
     icon: Icons.kitchen_outlined,
-    label: 'Pantry',
-    caption: 'Stock at a glance',
-    path: '/pantry',
+    label: 'Kitchen',
+    caption: 'Shopping & pantry',
+    path: '/kitchen',
     group: ModuleGroup.household,
   ),
   AppModule(
