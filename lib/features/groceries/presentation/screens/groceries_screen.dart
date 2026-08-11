@@ -109,13 +109,31 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
     qty.dispose();
     if (ok == true && itemName.isNotEmpty && mounted) {
       try {
-        final item = await ref.read(vivrantApiProvider).addGrocery({
+        final api = ref.read(vivrantApiProvider);
+        Map<String, dynamic>? estimate;
+        try {
+          estimate = await api.estimateGroceryCostAi(
+            name: itemName,
+            quantity: itemQty.isEmpty ? null : itemQty,
+          );
+        } catch (_) {
+          estimate = null;
+        }
+        final item = await api.addGrocery({
           'name': itemName,
           if (itemQty.isNotEmpty) 'quantity': itemQty,
+          if (estimate?['category'] != null) 'category': estimate!['category'],
+          if (estimate?['estimated_price'] != null)
+            'estimated_price': estimate!['estimated_price'],
         });
         if (!mounted) return;
         _setItems([..._items, item]);
-        context.showSuccess('Item added');
+        final tip = estimate?['store_tip']?.toString();
+        context.showSuccess(
+          tip != null && tip.isNotEmpty
+              ? 'Item added · $tip'
+              : 'Item added',
+        );
       } catch (e) {
         if (!mounted) return;
         context.showError(apiErrorMessage(e));

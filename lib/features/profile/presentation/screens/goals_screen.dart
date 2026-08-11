@@ -120,6 +120,67 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
     }
   }
 
+  Future<void> _suggestAi() async {
+    try {
+      final suggestions = await ref.read(vivrantApiProvider).suggestGoalsAi();
+      if (!mounted) return;
+      if (suggestions.isEmpty) {
+        context.showInfo('No goal ideas right now. Try again after logging more.');
+        return;
+      }
+      final chosen = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetCtx) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(
+                title: Text(
+                  'AI goal ideas',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text('Tailored to your BMI, pace, and recent logs'),
+              ),
+              ...suggestions.map((g) {
+                final title = g['title']?.toString() ?? 'Goal';
+                final why = g['why']?.toString();
+                final category = g['category']?.toString() ?? 'other';
+                final unit = g['unit']?.toString();
+                final target = g['target_value'];
+                final subtitle = [
+                  category,
+                  if (target != null) '$target${unit != null ? ' $unit' : ''}',
+                  if (why != null && why.isNotEmpty) why,
+                ].join(' · ');
+                return ListTile(
+                  leading: const Icon(Icons.auto_awesome),
+                  title: Text(title),
+                  subtitle: Text(subtitle),
+                  onTap: () => Navigator.pop(sheetCtx, g),
+                );
+              }),
+            ],
+          ),
+        ),
+      );
+      if (chosen == null || !mounted) return;
+      final goal = await ref.read(vivrantApiProvider).acceptSuggestedGoal({
+        'title': chosen['title'],
+        'category': chosen['category'] ?? 'other',
+        'target_value': chosen['target_value'],
+        'unit': chosen['unit'],
+      });
+      if (!mounted) return;
+      HapticFeedback.lightImpact();
+      _setGoals([goal, ..._goals]);
+      context.showSuccess('Goal added from AI');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   Color _statusColor(String status, bool dark) {
     switch (status) {
       case 'completed':
@@ -167,6 +228,13 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                 highlight: 'targets',
               ),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _suggestAi,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Suggest goals with AI'),
+            ),
+            const SizedBox(height: 12),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.only(top: 48),

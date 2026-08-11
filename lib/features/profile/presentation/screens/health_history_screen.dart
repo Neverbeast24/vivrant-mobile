@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -72,27 +73,64 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
   }
 
   Future<void> _add() async {
-    final title = TextEditingController();
+    final weight = TextEditingController();
+    final height = TextEditingController();
+    final bodyFat = TextEditingController();
+    final waist = TextEditingController();
     final note = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Add history'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: title,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: note,
-              decoration: const InputDecoration(labelText: 'Note'),
-              maxLines: 2,
-            ),
-          ],
+        title: const Text('Add measurement'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: weight,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Weight (kg)',
+                  hintText: '68',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: height,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Height (cm)',
+                  hintText: '154',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: bodyFat,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Body fat % (optional)',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: waist,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Waist cm (optional)',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: note,
+                decoration: const InputDecoration(
+                  labelText: 'Note (optional)',
+                  hintText: 'Morning weigh-in…',
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -106,21 +144,60 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
         ],
       ),
     );
-    if (ok == true && title.text.trim().isNotEmpty && mounted) {
-      try {
-        await ref.read(vivrantApiProvider).addHealthHistory({
-          'title': title.text.trim(),
-          if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
-        });
-        if (!mounted) return;
-        HapticFeedback.lightImpact();
-        context.showSuccess('Health history saved');
-        await _load();
-      } catch (e) {
-        if (!mounted) return;
-        context.showError(apiErrorMessage(e));
-      }
+    final weightKg = double.tryParse(weight.text.trim());
+    final heightCm = double.tryParse(height.text.trim());
+    final bodyFatPct = double.tryParse(bodyFat.text.trim());
+    final waistCm = double.tryParse(waist.text.trim());
+    final noteText = note.text.trim();
+    weight.dispose();
+    height.dispose();
+    bodyFat.dispose();
+    waist.dispose();
+    note.dispose();
+    if (ok != true || !mounted) return;
+    if (weightKg == null &&
+        heightCm == null &&
+        bodyFatPct == null &&
+        waistCm == null) {
+      context.showError('Add weight, height, body fat, or waist.');
+      return;
     }
+    try {
+      await ref.read(vivrantApiProvider).addHealthHistory({
+        if (weightKg != null) 'weight_kg': weightKg,
+        if (heightCm != null) 'height_cm': heightCm,
+        if (bodyFatPct != null) 'body_fat_pct': bodyFatPct,
+        if (waistCm != null) 'waist_cm': waistCm,
+        if (noteText.isNotEmpty) 'note': noteText,
+      });
+      if (!mounted) return;
+      HapticFeedback.lightImpact();
+      context.showSuccess('Health history saved');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _analyzeAi() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).analyzeHealthHistoryAi();
+      if (!mounted) return;
+      context.showInfo(
+        formatAiResponse(res, keys: const ['insight', 'advice', 'summary']),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  double? _bmiFor(Map<String, dynamic> e) {
+    final weight = (e['weight_kg'] as num?)?.toDouble();
+    final height = (e['height_cm'] as num?)?.toDouble();
+    if (weight == null || height == null || height <= 0) return null;
+    return weight / ((height / 100) * (height / 100));
   }
 
   @override
@@ -160,6 +237,13 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
                 highlight: 'history',
               ),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _analyzeAi,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Analyze with AI'),
+            ),
+            const SizedBox(height: 12),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.only(top: 48),
@@ -175,7 +259,7 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
               )
             else if (_entries.isEmpty)
               EmptyState(
-                message: 'No history entries yet. Add your first note.',
+                message: 'No measurements yet. Log weight or height to track BMI.',
                 action: PrimaryButton(
                   label: 'Add entry',
                   onPressed: _add,
@@ -187,11 +271,29 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
                 final e = _entries[i];
                 final start = (0.15 + i * 0.07).clamp(0.0, 0.7);
                 final end = (start + 0.35).clamp(0.0, 1.0);
-                final title = e['title']?.toString() ?? 'Entry';
+                final weight = e['weight_kg'];
+                final height = e['height_cm'];
+                final bmi = _bmiFor(e);
                 final note = e['note']?.toString();
-                final date = e['created_at']?.toString() ??
-                    e['date']?.toString() ??
-                    e['recorded_at']?.toString();
+                final date = e['recorded_at']?.toString() ??
+                    e['created_at']?.toString() ??
+                    e['date']?.toString();
+                final titleParts = <String>[
+                  if (date != null && date.isNotEmpty)
+                    date.length >= 10 ? date.substring(0, 10) : date,
+                  if (weight != null) '$weight kg',
+                  if (bmi != null) 'BMI ${bmi.toStringAsFixed(1)}',
+                ];
+                final subtitleParts = <String>[
+                  if (height != null) '$height cm',
+                  if (e['body_fat_pct'] != null) '${e['body_fat_pct']}% fat',
+                  if (e['waist_cm'] != null) '${e['waist_cm']} cm waist',
+                  if (note != null && note.isNotEmpty) note,
+                ];
+                final title = titleParts.isEmpty
+                    ? 'Measurement'
+                    : titleParts.join(' · ');
+                final subtitle = subtitleParts.join(' · ');
 
                 return FadeTransition(
                   opacity: CurvedAnimation(
@@ -236,7 +338,7 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
                                 borderRadius: BorderRadius.circular(13),
                               ),
                               child: Icon(
-                                Icons.history_edu_outlined,
+                                Icons.monitor_weight_outlined,
                                 color: accent,
                                 size: 20,
                               ),
@@ -253,26 +355,13 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
                                       fontSize: 15,
                                     ),
                                   ),
-                                  if (note != null && note.isNotEmpty) ...[
+                                  if (subtitle.isNotEmpty) ...[
                                     const SizedBox(height: 4),
                                     Text(
-                                      note,
+                                      subtitle,
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: muted,
                                         height: 1.4,
-                                      ),
-                                    ),
-                                  ],
-                                  if (date != null && date.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      date.length > 16
-                                          ? date.substring(0, 16)
-                                          : date,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: muted.withValues(alpha: 0.75),
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],

@@ -111,6 +111,27 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     }
   }
 
+  Future<void> _draftAi() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).draftReminderAi();
+      if (!mounted) return;
+      final reminder = res['reminder'];
+      if (reminder is Map) {
+        _setItems([
+          Map<String, dynamic>.from(reminder),
+          ..._items,
+        ]);
+      } else {
+        await _load();
+      }
+      if (!mounted) return;
+      context.showSuccess('AI reminder drafted');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   List<Map<String, dynamic>> get _filtered {
     final q = _query.text.trim().toLowerCase();
     return _items.where((r) {
@@ -143,6 +164,12 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
               title: 'Smart',
               highlight: 'reminders',
             ),
+            OutlinedButton.icon(
+              onPressed: _draftAi,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Draft reminder with AI'),
+            ),
+            const SizedBox(height: 16),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),

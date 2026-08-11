@@ -73,6 +73,27 @@ extension VivrantProfileApi on VivrantApi {
     await _client.delete('/api/mobile/goals/$id');
   }
 
+  /// BMI-aware goal suggestions.
+  Future<List<Map<String, dynamic>>> suggestGoalsAi() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/goals/suggest',
+      options: ApiClient.aiOptions,
+    );
+    return (res.data?['goals'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  Future<HealthGoal> acceptSuggestedGoal(Map<String, dynamic> body) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/goals/accept',
+      data: body,
+    );
+    return HealthGoal.fromJson(
+      Map<String, dynamic>.from(res.data?['goal'] ?? res.data ?? {}),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> healthHistory() async {
     final res = await _client.get<Map<String, dynamic>>(
       '/api/mobile/health-history',
@@ -84,6 +105,15 @@ extension VivrantProfileApi on VivrantApi {
 
   Future<void> addHealthHistory(Map<String, dynamic> body) async {
     await _client.post('/api/mobile/health-history', data: body);
+  }
+
+  /// BMI-aware health history analysis.
+  Future<Map<String, dynamic>> analyzeHealthHistoryAi() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/health-history/analyze',
+      options: ApiClient.aiOptions,
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
   }
 
   Future<void> savePreferences(Map<String, dynamic> body) async {

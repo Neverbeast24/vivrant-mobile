@@ -57,6 +57,7 @@ extension VivrantGymApi on VivrantApi {
         if (avoidTargets != null && avoidTargets.isNotEmpty)
           'avoid_targets': avoidTargets,
       },
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }
@@ -76,6 +77,7 @@ extension VivrantGymApi on VivrantApi {
   Future<Map<String, dynamic>> recommendMachinesAi() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/gym/machines/recommend',
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }

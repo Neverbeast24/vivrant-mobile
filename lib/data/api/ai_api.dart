@@ -62,6 +62,15 @@ extension VivrantAiApi on VivrantApi {
     );
   }
 
+  /// Draft + save an AI reminder personalized with BMI context.
+  Future<Map<String, dynamic>> draftReminderAi() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/ai/reminders/draft',
+      options: ApiClient.aiOptions,
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
   Future<void> toggleReminder(int id, bool enabled) async {
     await _client.patch(
       '/api/mobile/ai/reminders/$id',

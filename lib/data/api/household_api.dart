@@ -41,6 +41,22 @@ extension VivrantHouseholdApi on VivrantApi {
   Future<Map<String, dynamic>> smartGroceryPlan() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/groceries/plan',
+      options: ApiClient.aiOptions,
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
+  Future<Map<String, dynamic>> estimateGroceryCostAi({
+    required String name,
+    String? quantity,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/groceries/estimate-cost',
+      data: {
+        'name': name,
+        if (quantity != null && quantity.isNotEmpty) 'quantity': quantity,
+      },
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }
@@ -113,6 +129,7 @@ extension VivrantHouseholdApi on VivrantApi {
   Future<Map<String, dynamic>> coachSpending() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/spending/coach',
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }

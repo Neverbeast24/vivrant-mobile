@@ -6,8 +6,10 @@ extension VivrantWellnessApi on VivrantApi {
   }
 
   Future<Map<String, dynamic>> coachSleep() async {
-    final res =
-        await _client.post<Map<String, dynamic>>('/api/mobile/sleep/coach');
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/sleep/coach',
+      options: ApiClient.aiOptions,
+    );
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
@@ -33,6 +35,7 @@ extension VivrantWellnessApi on VivrantApi {
   Future<Map<String, dynamic>> coachMindfulness() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/mindfulness/coach',
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }
@@ -59,8 +62,10 @@ extension VivrantWellnessApi on VivrantApi {
   }
 
   Future<Map<String, dynamic>> reflectJournal() async {
-    final res =
-        await _client.post<Map<String, dynamic>>('/api/mobile/journal/reflect');
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/journal/reflect',
+      options: ApiClient.aiOptions,
+    );
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
@@ -87,6 +92,17 @@ extension VivrantWellnessApi on VivrantApi {
 
   Future<void> deleteHabit(int id) async {
     await _client.delete('/api/mobile/habits/$id');
+  }
+
+  /// BMI-aware habit suggestions.
+  Future<List<Map<String, dynamic>>> suggestHabitsAi() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/habits/suggest',
+      options: ApiClient.aiOptions,
+    );
+    return (res.data?['habits'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> listChallenges() async {

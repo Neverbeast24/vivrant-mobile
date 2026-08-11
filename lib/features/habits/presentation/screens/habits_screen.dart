@@ -142,6 +142,55 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     }
   }
 
+  Future<void> _suggestAi() async {
+    try {
+      final habits = await ref.read(vivrantApiProvider).suggestHabitsAi();
+      if (!mounted) return;
+      if (habits.isEmpty) {
+        context.showInfo('No habit ideas right now. Try again after logging more.');
+        return;
+      }
+      final chosen = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetCtx) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(
+                title: Text(
+                  'AI habit ideas',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text('Personalized from your BMI and recent logs'),
+              ),
+              ...habits.map((h) {
+                final title = h['title']?.toString() ?? 'Habit';
+                final reason = h['reason']?.toString();
+                return ListTile(
+                  leading: const Icon(Icons.auto_awesome),
+                  title: Text(title),
+                  subtitle: reason == null || reason.isEmpty ? null : Text(reason),
+                  onTap: () => Navigator.pop(sheetCtx, h),
+                );
+              }),
+            ],
+          ),
+        ),
+      );
+      if (chosen == null || !mounted) return;
+      final title = chosen['title']?.toString().trim() ?? '';
+      if (title.isEmpty) return;
+      final habit = await ref.read(vivrantApiProvider).addHabit(title);
+      if (!mounted) return;
+      _setHabits([..._habits, habit]);
+      context.showSuccess('Habit added');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   List<Habit> get _filtered {
     final q = _query.text.trim().toLowerCase();
     return _habits.where((h) {
@@ -182,6 +231,12 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               value: '$done / ${_habits.length}',
               caption: 'completed',
               icon: Icons.local_fire_department_outlined,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _suggestAi,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Suggest habits with AI'),
             ),
             const SizedBox(height: 16),
             if (_loading)

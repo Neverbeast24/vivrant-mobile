@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -234,10 +235,32 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
               icon: const Icon(Icons.auto_awesome),
               label: const Text('Estimate meal with AI'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _suggestMealAi,
+              icon: const Icon(Icons.restaurant_outlined),
+              label: const Text('Suggest meal with AI'),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _suggestMealAi() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).suggestMealAi();
+      if (!mounted) return;
+      context.showInfo(
+        formatAiResponse(
+          res,
+          keys: const ['suggestion', 'advice', 'tip', 'reason'],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
   }
 
   Future<void> _estimateMeal() async {

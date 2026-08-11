@@ -29,6 +29,7 @@ extension VivrantMovementApi on VivrantApi {
   Future<Map<String, dynamic>> suggestWorkoutAi() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/movement/suggest',
+      options: ApiClient.aiOptions,
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }

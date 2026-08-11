@@ -52,6 +52,15 @@ extension VivrantNutritionApi on VivrantApi {
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
+  /// BMI-aware next-meal idea from pantry + today's logs.
+  Future<Map<String, dynamic>> suggestMealAi() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/nutrition/suggest',
+      options: ApiClient.aiOptions,
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
   Future<void> addWater(int ml) async {
     await _client.post('/api/mobile/nutrition/water', data: {'ml': ml});
   }
