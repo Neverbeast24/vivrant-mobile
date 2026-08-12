@@ -6,10 +6,12 @@ class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
     required this.message,
+    this.title,
     this.action,
   });
 
   final String message;
+  final String? title;
   final Widget? action;
 
   @override
@@ -27,6 +29,16 @@ class EmptyState extends StatelessWidget {
       ),
       child: Column(
         children: [
+          if (title != null) ...[
+            Text(
+              title!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Text(
             message,
             textAlign: TextAlign.center,

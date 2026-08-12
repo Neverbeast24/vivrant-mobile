@@ -114,7 +114,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
             child: PageHeader(
-              eyebrow: 'Viva',
+              eyebrow: 'Ask for help',
               title: 'Ask',
               highlight: 'anything',
               trailing: Row(

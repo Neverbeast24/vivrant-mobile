@@ -19,6 +19,7 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
   final _query = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
+  bool _syncing = false;
   String? _error;
   String _filter = 'all';
 
@@ -51,7 +52,8 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
   }
 
   Future<void> _load() async {
-    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.challenges);
+    final showSpinner =
+        ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.challenges);
     setState(() {
       if (showSpinner) _loading = true;
       _error = null;
@@ -66,6 +68,27 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
         _error = apiErrorMessage(e);
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _syncProgress() async {
+    setState(() => _syncing = true);
+    try {
+      final res = await ref.read(vivrantApiProvider).refreshChallenges();
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      final updated = res['updated'];
+      context.showSuccess(
+        updated == null
+            ? 'Challenge progress synced'
+            : 'Synced · $updated updated',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _syncing = false);
     }
   }
 
@@ -110,6 +133,22 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
     }
   }
 
+  Future<void> _delete(int id) async {
+    final prev = _items.map((e) => Map<String, dynamic>.from(e)).toList();
+    _setItems(
+      _items.where((item) => (item['id'] as num?)?.toInt() != id).toList(),
+    );
+    try {
+      await ref.read(vivrantApiProvider).deleteChallenge(id);
+      if (!mounted) return;
+      context.showSuccess('Challenge removed');
+    } catch (e) {
+      if (!mounted) return;
+      _setItems(prev);
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   List<String> get _statuses {
     final values = _items
         .map((c) => c['status']?.toString() ?? 'active')
@@ -130,6 +169,13 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
     }).toList();
   }
 
+  double _progressPct(Map<String, dynamic> c) {
+    final current = (c['current_value'] as num?)?.toDouble() ?? 0;
+    final target = (c['target_value'] as num?)?.toDouble() ?? 0;
+    if (target <= 0) return 0;
+    return (current / target).clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -137,6 +183,17 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
       appBar: AppBar(
         title: const Text('Challenges'),
         actions: [
+          IconButton(
+            onPressed: _syncing ? null : _syncProgress,
+            tooltip: 'Sync progress',
+            icon: _syncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+          ),
           IconButton(onPressed: _create, icon: const Icon(Icons.add)),
         ],
       ),
@@ -150,6 +207,12 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
               title: 'Active',
               highlight: 'challenges',
             ),
+            OutlinedButton.icon(
+              onPressed: _syncing ? null : _syncProgress,
+              icon: const Icon(Icons.sync),
+              label: Text(_syncing ? 'Syncing…' : 'Sync progress'),
+            ),
+            const SizedBox(height: 16),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
@@ -207,28 +270,64 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
                       'No challenges match these filters. Try All or another search.',
                 )
               else
-                ...filtered.map(
-                  (c) => Padding(
+                ...filtered.map((c) {
+                  final id = (c['id'] as num?)?.toInt();
+                  final current = (c['current_value'] as num?)?.toDouble() ?? 0;
+                  final target = (c['target_value'] as num?)?.toDouble();
+                  final pct = _progressPct(c);
+                  final done = c['completed'] == true;
+                  return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: VivrantPanel(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            c['title']?.toString() ?? 'Challenge',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${c['title']?.toString() ?? 'Challenge'}${done ? ' · Done' : ''}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              if (id != null)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _delete(id),
+                                ),
+                            ],
                           ),
                           Text(
-                            '${c['duration_days'] ?? '—'} days · ${c['status'] ?? 'active'}',
+                            [
+                              if (c['metric'] != null) c['metric'].toString(),
+                              if (c['duration_days'] != null)
+                                '${c['duration_days']} days',
+                              c['status']?.toString() ?? 'active',
+                            ].join(' · '),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
+                          if (target != null && target > 0) ...[
+                            const SizedBox(height: 10),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: pct,
+                                minHeight: 8,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${current.toStringAsFixed(0)} / ${target.toStringAsFixed(0)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
             ],
           ],
         ),

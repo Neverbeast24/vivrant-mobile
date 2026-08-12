@@ -45,10 +45,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     setState(() => _loading = false);
     final err = ref.read(authProvider).error;
     if (ok) {
-      context.showSuccess(err ?? 'Account created.');
-      if (err != null) context.go('/login');
+      if (err != null) {
+        context.showInfo(err);
+        context.go('/login');
+      } else {
+        context.showSuccess('Account created. You’re signed in.');
+      }
     } else {
-      context.showError(err ?? 'Signup failed');
+      context.showError(err ?? 'Could not create your account. Please try again.');
     }
   }
 
@@ -66,13 +70,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               const PageHeader(
                 eyebrow: 'Join VIVRΛNT',
                 title: 'Create your',
-                highlight: 'space',
+                highlight: 'account',
               ),
+              Text(
+                'A few details and you’re ready to track meals, workouts, and sleep.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: muted),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _name,
                 textInputAction: TextInputAction.next,
                 autofillHints: const [AutofillHints.name],
-                decoration: const InputDecoration(labelText: 'Display name'),
+                decoration: const InputDecoration(labelText: 'Your name'),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -94,7 +103,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   if (!_loading) _submit();
                 },
                 decoration: InputDecoration(
-                  labelText: 'Password (min 8 chars)',
+                  labelText: 'Password (at least 8 characters)',
                   suffixIcon: IconButton(
                     tooltip: _obscure ? 'Show password' : 'Hide password',
                     icon: Icon(

@@ -123,4 +123,15 @@ extension VivrantWellnessApi on VivrantApi {
       res.data?['challenge'] as Map? ?? res.data ?? {},
     );
   }
+
+  Future<Map<String, dynamic>> refreshChallenges() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/habits/challenges/refresh',
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
+  Future<void> deleteChallenge(int id) async {
+    await _client.delete('/api/mobile/habits/challenges/$id');
+  }
 }

@@ -36,6 +36,14 @@ extension VivrantAiApi on VivrantApi {
     );
   }
 
+  Future<List<Map<String, dynamic>>> listInsights() async {
+    final res =
+        await _client.get<Map<String, dynamic>>('/api/mobile/ai/insights');
+    return (res.data?['insights'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> generateInsight() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/ai/insights',
@@ -67,6 +75,14 @@ extension VivrantAiApi on VivrantApi {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/ai/reminders/draft',
       options: ApiClient.aiOptions,
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
+  /// Create/refresh reminders from the member's latest active gym plan.
+  Future<Map<String, dynamic>> syncRemindersFromGymPlan() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/ai/reminders/sync-gym-plan',
     );
     return Map<String, dynamic>.from(res.data ?? {});
   }

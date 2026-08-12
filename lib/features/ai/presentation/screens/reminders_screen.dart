@@ -132,6 +132,29 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     }
   }
 
+  Future<void> _syncGymPlan() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).syncRemindersFromGymPlan();
+      if (!mounted) return;
+      final reminder = res['reminder'];
+      if (reminder is Map) {
+        final next = Map<String, dynamic>.from(reminder);
+        final id = (next['id'] as num?)?.toInt();
+        _setItems([
+          next,
+          ..._items.where((r) => (r['id'] as num?)?.toInt() != id),
+        ]);
+      } else {
+        await _load();
+      }
+      if (!mounted) return;
+      context.showSuccess('Gym plan synced to reminders');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   List<Map<String, dynamic>> get _filtered {
     final q = _query.text.trim().toLowerCase();
     return _items.where((r) {
@@ -160,7 +183,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
           padding: const EdgeInsets.all(20),
           children: [
             const PageHeader(
-              eyebrow: 'AI',
+              eyebrow: 'Ask for help',
               title: 'Smart',
               highlight: 'reminders',
             ),
@@ -168,6 +191,12 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
               onPressed: _draftAi,
               icon: const Icon(Icons.auto_awesome),
               label: const Text('Draft reminder with AI'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _syncGymPlan,
+              icon: const Icon(Icons.fitness_center),
+              label: const Text('Sync gym plan'),
             ),
             const SizedBox(height: 16),
             if (_loading)

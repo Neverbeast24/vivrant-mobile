@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -40,6 +42,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
 
   bool _loading = true;
   bool _generating = false;
+  bool _showCustomize = false;
   String? _error;
   String _filter = 'all';
   String _knownMuscle = 'all';
@@ -166,7 +169,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             avoidTargets: _avoidTargets.toList(),
           );
       if (!mounted) return;
-      context.showSuccess('AI plan created');
+      context.showSuccess('Your plan is ready');
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -318,19 +321,24 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               title: 'Training',
               highlight: 'plans',
             ),
+            Text(
+              'Create a simple weekly plan that fits your schedule.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
             VivrantPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'AI plan prefs',
+                    'How often do you train?',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Same options as web: days, session length, avoid targets, known exercises, and custom moves. Choices stay on this device.',
+                    'Choose days and minutes, then create a plan. Extra options are optional.',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
@@ -341,7 +349,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                           controller: _daysCtrl,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Days / week',
+                            labelText: 'Days per week',
                             helperText: '2–6',
                           ),
                           onChanged: (_) => _persistPrefs(),
@@ -353,7 +361,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                           controller: _sessionCtrl,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Session (min)',
+                            labelText: 'Minutes per workout',
                             helperText: '15–120',
                           ),
                           onChanged: (_) => _persistPrefs(),
@@ -361,167 +369,187 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Avoid targeting',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final target in gymAvoidTargets)
-                        FilterChip(
-                          label: Text(humanizeLabel(target)),
-                          selected: _avoidTargets.contains(target),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _avoidTargets.add(target);
-                              } else {
-                                _avoidTargets.remove(target);
-                              }
-                            });
-                            _persistPrefs();
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Exercises you know',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Search or filter by muscle, then Select all in view — AI plans prioritize your list.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Chip(
-                        label: Text(
-                          '${_knownSlugs.length + _customExercises.length} selected',
-                        ),
-                      ),
-                      if (_visibleKnownExercises.isNotEmpty)
-                        TextButton(
-                          onPressed: _toggleSelectAllKnownInView,
-                          child: Text(
-                            _allVisibleKnownSelected
-                                ? 'Deselect in view'
-                                : 'Select all in view (${_visibleKnownExercises.length})',
-                          ),
-                        ),
-                      if (_knownSlugs.isNotEmpty || _customExercises.isNotEmpty)
-                        TextButton(
-                          onPressed: _clearKnown,
-                          child: const Text('Clear all'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  VivrantSearchField(
-                    controller: _knownQuery,
-                    hintText: 'Search exercises…',
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 10),
-                  VivrantFilterChips<String>(
-                    options: [
-                      for (final muscle in gymMuscleFilters)
-                        VivrantFilterOption(
-                          value: muscle,
-                          label: muscleFilterLabel(muscle),
-                        ),
-                    ],
-                    selected: _knownMuscle,
-                    onSelected: (v) => setState(() => _knownMuscle = v),
-                  ),
-                  const SizedBox(height: 10),
-                  _ExerciseChecklist(
-                    title: 'Machines (${_filteredMachines.length})',
-                    exercises: _filteredMachines,
-                    emptyMessage: _machines.isEmpty
-                        ? 'No machines in the catalog yet.'
-                        : 'No machines match this search or muscle filter.',
-                    selected: _knownSlugs,
-                    onToggle: _toggleKnown,
-                    onDemo: (ex) => showExerciseDemoSheet(context, ex),
-                  ),
-                  const SizedBox(height: 10),
-                  _ExerciseChecklist(
-                    title:
-                        'Free weights & bodyweight (${_filteredFreeWeights.length})',
-                    exercises: _filteredFreeWeights,
-                    emptyMessage: _freeWeights.isEmpty
-                        ? 'No free-weight moves in the catalog yet.'
-                        : 'No free-weight moves match this search or muscle filter.',
-                    selected: _knownSlugs,
-                    onToggle: _toggleKnown,
-                    onDemo: (ex) => showExerciseDemoSheet(context, ex),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Other',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _customCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'e.g. Hip thrust, landmine press…',
-                          ),
-                          onSubmitted: (_) => _addCustom(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _addCustom,
-                        child: const Text('Add'),
-                      ),
-                    ],
-                  ),
-                  if (_customExercises.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final name in _customExercises)
-                          InputChip(
-                            label: Text(name),
-                            onDeleted: () {
-                              setState(() => _customExercises.remove(name));
-                              _persistPrefs();
-                            },
-                          ),
-                      ],
-                    ),
-                  ],
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: _generating ? null : _createAi,
                       icon: const Icon(Icons.auto_awesome),
-                      label: Text(_generating ? 'Building plan…' : 'Generate AI plan'),
+                      label: Text(
+                        _generating ? 'Creating your plan…' : 'Create my plan',
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: () =>
+                        setState(() => _showCustomize = !_showCustomize),
+                    icon: Icon(
+                      _showCustomize
+                          ? Icons.expand_less
+                          : Icons.tune_rounded,
+                    ),
+                    label: Text(
+                      _showCustomize
+                          ? 'Hide optional settings'
+                          : 'Customize (optional)',
+                    ),
+                  ),
+                  if (_showCustomize) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Skip these areas',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final target in gymAvoidTargets)
+                          FilterChip(
+                            label: Text(humanizeLabel(target)),
+                            selected: _avoidTargets.contains(target),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _avoidTargets.add(target);
+                                } else {
+                                  _avoidTargets.remove(target);
+                                }
+                              });
+                              _persistPrefs();
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Moves you already know',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Optional: mark exercises you know so your plan can prefer them.',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Chip(
+                          label: Text(
+                            '${_knownSlugs.length + _customExercises.length} selected',
+                          ),
+                        ),
+                        if (_visibleKnownExercises.isNotEmpty)
+                          TextButton(
+                            onPressed: _toggleSelectAllKnownInView,
+                            child: Text(
+                              _allVisibleKnownSelected
+                                  ? 'Clear these'
+                                  : 'Select these (${_visibleKnownExercises.length})',
+                            ),
+                          ),
+                        if (_knownSlugs.isNotEmpty ||
+                            _customExercises.isNotEmpty)
+                          TextButton(
+                            onPressed: _clearKnown,
+                            child: const Text('Clear all'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    VivrantSearchField(
+                      controller: _knownQuery,
+                      hintText: 'Search exercises…',
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    VivrantFilterChips<String>(
+                      options: [
+                        for (final muscle in gymMuscleFilters)
+                          VivrantFilterOption(
+                            value: muscle,
+                            label: muscleFilterLabel(muscle),
+                          ),
+                      ],
+                      selected: _knownMuscle,
+                      onSelected: (v) => setState(() => _knownMuscle = v),
+                    ),
+                    const SizedBox(height: 10),
+                    _ExerciseChecklist(
+                      title: 'Machines (${_filteredMachines.length})',
+                      exercises: _filteredMachines,
+                      emptyMessage: _machines.isEmpty
+                          ? 'No machines listed yet.'
+                          : 'No machines match this search.',
+                      selected: _knownSlugs,
+                      onToggle: _toggleKnown,
+                      onDemo: (ex) => showExerciseDemoSheet(context, ex),
+                    ),
+                    const SizedBox(height: 10),
+                    _ExerciseChecklist(
+                      title:
+                          'Free weights & bodyweight (${_filteredFreeWeights.length})',
+                      exercises: _filteredFreeWeights,
+                      emptyMessage: _freeWeights.isEmpty
+                          ? 'No free-weight moves listed yet.'
+                          : 'No free-weight moves match this search.',
+                      selected: _knownSlugs,
+                      onToggle: _toggleKnown,
+                      onDemo: (ex) => showExerciseDemoSheet(context, ex),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Other moves',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _customCtrl,
+                            decoration: const InputDecoration(
+                              hintText: 'e.g. Hip thrust…',
+                            ),
+                            onSubmitted: (_) => _addCustom(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: _addCustom,
+                          child: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                    if (_customExercises.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final name in _customExercises)
+                            InputChip(
+                              label: Text(name),
+                              onDeleted: () {
+                                setState(() => _customExercises.remove(name));
+                                _persistPrefs();
+                              },
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
@@ -536,15 +564,16 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                 message: _error!,
                 action: OutlinedButton(
                   onPressed: _load,
-                  child: const Text('Retry'),
+                  child: const Text('Try again'),
                 ),
               )
             else if (_plans.isEmpty)
               EmptyState(
-                message: 'No plans yet. Set prefs above and generate one with AI.',
+                title: 'No plan yet',
+                message: 'Choose how often you train above, then create a plan.',
                 action: ElevatedButton(
                   onPressed: _generating ? null : _createAi,
-                  child: const Text('Create AI plan'),
+                  child: const Text('Create my plan'),
                 ),
               )
             else ...[
@@ -664,7 +693,7 @@ class _ExerciseChecklist extends StatelessWidget {
           )
         else
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 180),
+            constraints: const BoxConstraints(maxHeight: 220),
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: exercises.length,
@@ -676,11 +705,30 @@ class _ExerciseChecklist extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   value: checked,
                   onChanged: (_) => onToggle(ex.slug),
-                  title: Text(ex.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    '${humanizeLabel(ex.muscleGroup)} · ${humanizeLabel(ex.equipment)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  title: Row(
+                    children: [
+                      _KnownExerciseThumb(exercise: ex),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ex.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              '${humanizeLabel(ex.muscleGroup)} · ${humanizeLabel(ex.equipment)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   secondary: ex.hasDemo
                       ? IconButton(
@@ -694,6 +742,48 @@ class _ExerciseChecklist extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _KnownExerciseThumb extends StatelessWidget {
+  const _KnownExerciseThumb({
+    required this.exercise,
+    this.size = 40,
+  });
+
+  final GymExercise exercise;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
+    final thumb = exercise.demoThumbnailUrl?.trim();
+    final hasThumb = thumb != null && thumb.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: hasThumb
+            ? CachedNetworkImage(
+                imageUrl: thumb,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => ColoredBox(
+                  color: c.accentSoft,
+                  child: Icon(muscleIcon(exercise.muscleGroup), color: c.accent, size: 18),
+                ),
+                errorWidget: (_, __, ___) => ColoredBox(
+                  color: c.accentSoft,
+                  child: Icon(muscleIcon(exercise.muscleGroup), color: c.accent, size: 18),
+                ),
+              )
+            : ColoredBox(
+                color: c.accentSoft,
+                child: Icon(muscleIcon(exercise.muscleGroup), color: c.accent, size: 18),
+              ),
+      ),
     );
   }
 }
@@ -778,6 +868,10 @@ class _PlanCard extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
                           children: [
+                            if (linked != null) ...[
+                              _KnownExerciseThumb(exercise: linked, size: 32),
+                              const SizedBox(width: 8),
+                            ],
                             Expanded(
                               child: Text(
                                 '$name · ${ex['sets'] ?? ''} · rest ${ex['rest'] ?? ''}',

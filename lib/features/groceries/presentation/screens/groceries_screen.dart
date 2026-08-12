@@ -184,6 +184,155 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
     }
   }
 
+  Future<void> _smartPlan() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).smartGroceryPlan();
+      if (!mounted) return;
+      final planRaw = res['plan'];
+      final plan = planRaw is Map
+          ? Map<String, dynamic>.from(planRaw)
+          : Map<String, dynamic>.from(res);
+      final items = (plan['items'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      final meals = (plan['meals'] as List? ?? [])
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      final add = await showModalBottomSheet<bool>(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (sheetCtx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  plan['title']?.toString() ?? 'Smart grocery plan',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                if (plan['summary'] != null) ...[
+                  const SizedBox(height: 8),
+                  Text(plan['summary'].toString()),
+                ],
+                if (plan['budget_note'] != null ||
+                    plan['estimated_total'] != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    [
+                      if (plan['budget_note'] != null)
+                        plan['budget_note'].toString(),
+                      if (plan['estimated_total'] != null)
+                        'Total ~₱${plan['estimated_total']}',
+                    ].join(' · '),
+                    style: Theme.of(sheetCtx).textTheme.bodySmall,
+                  ),
+                ],
+                if (meals.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Meal ideas',
+                    style: Theme.of(sheetCtx).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...meals.map(
+                    (m) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('· $m'),
+                    ),
+                  ),
+                ],
+                if (items.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Suggested items',
+                    style: Theme.of(sheetCtx).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(sheetCtx).height * 0.35,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final item = items[i];
+                        final price = item['estimated_price'];
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(item['name']?.toString() ?? 'Item'),
+                          subtitle: Text(
+                            [
+                              if (item['quantity'] != null)
+                                item['quantity'].toString(),
+                              if (item['category'] != null)
+                                item['category'].toString(),
+                            ].join(' · '),
+                          ),
+                          trailing: price == null
+                              ? null
+                              : Text(
+                                  '₱$price',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: items.isEmpty
+                        ? null
+                        : () => Navigator.pop(sheetCtx, true),
+                    child: Text(
+                      items.isEmpty
+                          ? 'No items to add'
+                          : 'Add all to shopping list',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      if (add == true && items.isNotEmpty && mounted) {
+        final added = await ref
+            .read(vivrantApiProvider)
+            .addGroceryPlanItems(items);
+        if (!mounted) return;
+        _setItems([..._items, ...added]);
+        context.showSuccess(
+          'Added ${added.length} item${added.length == 1 ? '' : 's'} to your list',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   List<GroceryItem> get _filtered {
     final q = _query.text.trim().toLowerCase();
     return _items.where((item) {
@@ -249,20 +398,7 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
                 ActionChip(
                   avatar: const Icon(Icons.auto_awesome, size: 16),
                   label: const Text('Smart plan'),
-                  onPressed: () async {
-                    try {
-                      final res =
-                          await ref.read(vivrantApiProvider).smartGroceryPlan();
-                      if (!mounted) return;
-                      context.showInfo(
-                        res['summary']?.toString() ?? res.toString(),
-                      );
-                      await _load();
-                    } catch (e) {
-                      if (!mounted) return;
-                      context.showError(apiErrorMessage(e));
-                    }
-                  },
+                  onPressed: _smartPlan,
                 ),
               ],
             ),

@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -114,9 +116,14 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
           children: [
             const PageHeader(
               eyebrow: 'Equipment',
-              title: 'Machine',
-              highlight: 'picks',
+              title: 'Gym',
+              highlight: 'machines',
             ),
+            Text(
+              'Browse machines and watch short demos. Or get simple suggestions for you.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
             ElevatedButton.icon(
               onPressed: () async {
                 try {
@@ -133,7 +140,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                     );
                   if (recs.isEmpty) {
                     context.showInfo(
-                      res['summary']?.toString() ?? 'No recommendations yet.',
+                      res['summary']?.toString() ?? 'No suggestions yet.',
                     );
                     return;
                   }
@@ -150,7 +157,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                res['title']?.toString() ?? 'AI machine picks',
+                                res['title']?.toString() ?? 'Suggested machines',
                                 style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -182,6 +189,9 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                                     }
                                     return ListTile(
                                       contentPadding: EdgeInsets.zero,
+                                      leading: demo != null
+                                          ? _RecThumb(exercise: demo)
+                                          : null,
                                       title: Text(
                                         item['machine']?.toString() ?? 'Machine',
                                         style: const TextStyle(fontWeight: FontWeight.w800),
@@ -217,7 +227,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                 }
               },
               icon: const Icon(Icons.auto_awesome),
-              label: const Text('Recommend machines with AI'),
+              label: const Text('Suggest machines for me'),
             ),
             const SizedBox(height: 16),
             if (_loading)
@@ -230,11 +240,14 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                 message: _error!,
                 action: OutlinedButton(
                   onPressed: _load,
-                  child: const Text('Retry'),
+                  child: const Text('Try again'),
                 ),
               )
             else if (_exercises.isEmpty)
-              const EmptyState(message: 'No machine demos yet.')
+              const EmptyState(
+                title: 'No machines yet',
+                message: 'Machine demos will show up here when available.',
+              )
             else ...[
               VivrantSearchField(
                 controller: _query,
@@ -276,6 +289,44 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RecThumb extends StatelessWidget {
+  const _RecThumb({required this.exercise});
+
+  final GymExercise exercise;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
+    final thumb = exercise.demoThumbnailUrl?.trim();
+    final hasThumb = thumb != null && thumb.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: hasThumb
+            ? CachedNetworkImage(
+                imageUrl: thumb,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => ColoredBox(
+                  color: c.accentSoft,
+                  child: Icon(muscleIcon(exercise.muscleGroup), color: c.accent, size: 20),
+                ),
+                errorWidget: (_, __, ___) => ColoredBox(
+                  color: c.accentSoft,
+                  child: Icon(muscleIcon(exercise.muscleGroup), color: c.accent, size: 20),
+                ),
+              )
+            : ColoredBox(
+                color: c.accentSoft,
+                child: Icon(muscleIcon(exercise.muscleGroup), color: c.accent, size: 20),
+              ),
       ),
     );
   }

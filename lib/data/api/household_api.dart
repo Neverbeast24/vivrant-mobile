@@ -46,6 +46,19 @@ extension VivrantHouseholdApi on VivrantApi {
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
+  /// Add AI plan items (up to 12) to the shopping list.
+  Future<List<GroceryItem>> addGroceryPlanItems(
+    List<Map<String, dynamic>> items,
+  ) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/groceries/plan/add',
+      data: {'items': items},
+    );
+    return (res.data?['items'] as List? ?? [])
+        .map((e) => GroceryItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> estimateGroceryCostAi({
     required String name,
     String? quantity,

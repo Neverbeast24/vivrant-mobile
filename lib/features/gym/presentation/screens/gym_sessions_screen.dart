@@ -23,6 +23,17 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
   String? _error;
   String _filter = 'all';
 
+  static const _focusOptions = <(String, String)>[
+    ('full_body', 'Full body'),
+    ('upper', 'Upper body'),
+    ('lower', 'Legs'),
+    ('core', 'Core'),
+    ('strength', 'Strength'),
+    ('cardio', 'Cardio'),
+  ];
+
+  static const _durationOptions = <int>[20, 30, 45, 60];
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +54,8 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
   }
 
   Future<void> _load() async {
-    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.gymSessions);
+    final showSpinner =
+        ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.gymSessions);
     setState(() {
       if (showSpinner) _loading = true;
       _error = null;
@@ -66,33 +78,94 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
   }
 
   Future<void> _log() async {
-    final title = TextEditingController(text: 'Gym session');
+    final title = TextEditingController(text: 'Gym workout');
+    var focus = 'full_body';
+    var duration = 45;
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Log gym session'),
-        content: TextField(
-          controller: title,
-          decoration: const InputDecoration(labelText: 'Title'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (c) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Log a workout'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: title,
+                    decoration: const InputDecoration(
+                      labelText: 'What did you do?',
+                      hintText: 'e.g. Leg day',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Focus',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final option in _focusOptions)
+                        ChoiceChip(
+                          label: Text(option.$2),
+                          selected: focus == option.$1,
+                          onSelected: (_) =>
+                              setDialogState(() => focus = option.$1),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Minutes',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final mins in _durationOptions)
+                        ChoiceChip(
+                          label: Text('$mins'),
+                          selected: duration == mins,
+                          onSelected: (_) =>
+                              setDialogState(() => duration = mins),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
+
     if (ok == true && mounted) {
       try {
         final session = await ref.read(vivrantApiProvider).logGymSession({
-          'title': title.text.trim(),
-          'focus': 'full_body',
-          'duration_minutes': 45,
+          'title': title.text.trim().isEmpty ? 'Gym workout' : title.text.trim(),
+          'focus': focus,
+          'duration_minutes': duration,
         });
         if (!mounted) return;
         setState(() {
@@ -101,12 +174,13 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
           _error = null;
         });
         ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymSessions, _items);
-        context.showSuccess('Session logged');
+        context.showSuccess('Workout saved');
       } catch (e) {
         if (!mounted) return;
         context.showError(apiErrorMessage(e));
       }
     }
+    title.dispose();
   }
 
   List<String> get _focuses {
@@ -134,9 +208,13 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
     final filtered = _filtered;
     return GradientScaffold(
       appBar: AppBar(
-        title: const Text('Sessions'),
+        title: const Text('Workouts'),
         actions: [
-          IconButton(onPressed: _log, icon: const Icon(Icons.add)),
+          IconButton(
+            onPressed: _log,
+            icon: const Icon(Icons.add),
+            tooltip: 'Log a workout',
+          ),
         ],
       ),
       child: RefreshIndicator(
@@ -146,9 +224,14 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
           children: [
             const PageHeader(
               eyebrow: 'Gym',
-              title: 'Logged',
-              highlight: 'sessions',
+              title: 'Your',
+              highlight: 'workouts',
             ),
+            Text(
+              'Save gym sessions so you can see your progress.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
@@ -159,15 +242,22 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                 message: _error!,
                 action: OutlinedButton(
                   onPressed: _load,
-                  child: const Text('Retry'),
+                  child: const Text('Try again'),
                 ),
               )
             else if (_items.isEmpty)
-              const EmptyState(message: 'No gym sessions yet.')
+              EmptyState(
+                title: 'No workouts yet',
+                message: 'Log your first gym session — it only takes a minute.',
+                action: ElevatedButton(
+                  onPressed: _log,
+                  child: const Text('Log a workout'),
+                ),
+              )
             else ...[
               VivrantSearchField(
                 controller: _query,
-                hintText: 'Search sessions…',
+                hintText: 'Search workouts…',
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 14),
@@ -192,8 +282,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
               const SizedBox(height: 16),
               if (filtered.isEmpty)
                 const EmptyState(
-                  message:
-                      'No sessions match these filters. Try All or another search.',
+                  message: 'Nothing matches. Try All or another search.',
                 )
               else
                 ...filtered.map(
@@ -213,7 +302,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${humanizeLabel(s.focus ?? 'session')} · ${s.durationMinutes ?? '—'} min',
+                                  '${humanizeLabel(s.focus ?? 'workout')} · ${s.durationMinutes ?? '—'} min',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
@@ -221,6 +310,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Remove',
                             onPressed: () async {
                               try {
                                 await ref
@@ -228,14 +318,13 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                                     .deleteGymSession(s.id);
                                 if (!mounted) return;
                                 setState(() {
-                                  _items = _items
-                                      .where((x) => x.id != s.id)
-                                      .toList();
+                                  _items =
+                                      _items.where((x) => x.id != s.id).toList();
                                 });
                                 ref
                                     .read(moduleCacheProvider)
                                     .write(ModuleCacheKeys.gymSessions, _items);
-                                context.showSuccess('Session removed');
+                                context.showSuccess('Workout removed');
                               } catch (e) {
                                 if (!mounted) return;
                                 context.showError(apiErrorMessage(e));

@@ -153,7 +153,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               OutlinedButton.icon(
                 onPressed: _weeklyStory,
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('Generate weekly story'),
+                label: const Text('Generate weekly summary'),
               ),
               if (_story != null) ...[
                 const SizedBox(height: 16),

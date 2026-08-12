@@ -181,6 +181,24 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
     }
   }
 
+  Future<void> _refreshProgress() async {
+    try {
+      final res = await ref.read(vivrantApiProvider).refreshGoalProgress();
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      final updated = res['updated'];
+      context.showSuccess(
+        updated == null
+            ? 'Goal progress synced'
+            : 'Synced · $updated goals updated',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   Color _statusColor(String status, bool dark) {
     switch (status) {
       case 'completed':
@@ -233,6 +251,12 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
               onPressed: _suggestAi,
               icon: const Icon(Icons.auto_awesome),
               label: const Text('Suggest goals with AI'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _refreshProgress,
+              icon: const Icon(Icons.sync),
+              label: const Text('Sync from logs'),
             ),
             const SizedBox(height: 12),
             if (_loading)
@@ -349,12 +373,19 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        g.category,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                          color: muted,
-                                          fontSize: 12.5,
+                                      Flexible(
+                                        child: Text(
+                                          [
+                                            g.category,
+                                            if (g.targetValue != null)
+                                              '${g.currentValue?.toStringAsFixed(0) ?? '0'} / ${g.targetValue!.toStringAsFixed(0)}${g.unit != null ? ' ${g.unit}' : ''}',
+                                          ].join(' · '),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: muted,
+                                            fontSize: 12.5,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],

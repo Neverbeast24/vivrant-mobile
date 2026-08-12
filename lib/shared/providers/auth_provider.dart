@@ -23,22 +23,31 @@ class AuthState {
     required this.status,
     this.profile,
     this.error,
+    this.idleWarningSeconds,
   });
 
   final AuthStatus status;
   final Profile? profile;
   final String? error;
 
+  /// Seconds until idle logout; non-null only inside the warning window.
+  final int? idleWarningSeconds;
+
   AuthState copyWith({
     AuthStatus? status,
     Profile? profile,
     String? error,
     bool clearError = false,
+    int? idleWarningSeconds,
+    bool clearIdleWarning = false,
   }) {
     return AuthState(
       status: status ?? this.status,
       profile: profile ?? this.profile,
       error: clearError ? null : (error ?? this.error),
+      idleWarningSeconds: clearIdleWarning
+          ? null
+          : (idleWarningSeconds ?? this.idleWarningSeconds),
     );
   }
 }
@@ -59,10 +68,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final PushService _push;
   late final _AppLifecycleObserver _lifecycleObserver;
   Timer? _sessionTimer;
+  Timer? _warnArmTimer;
+  Timer? _idleTickTimer;
+  DateTime? _lastActivityNoteAt;
 
   @override
   void dispose() {
     _sessionTimer?.cancel();
+    _warnArmTimer?.cancel();
+    _idleTickTimer?.cancel();
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     super.dispose();
   }
@@ -82,7 +96,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void _armSessionTimer() {
     _sessionTimer?.cancel();
-    if (state.status != AuthStatus.authenticated) return;
+    _warnArmTimer?.cancel();
+    _idleTickTimer?.cancel();
+    if (state.status != AuthStatus.authenticated) {
+      if (state.idleWarningSeconds != null) {
+        state = state.copyWith(clearIdleWarning: true);
+      }
+      return;
+    }
     final remaining = _client.sessionTimeRemaining;
     if (remaining <= Duration.zero) {
       unawaited(_expireSession());
@@ -90,13 +111,69 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
     if (kDebugMode) {
       debugPrint(
-        '[vivrant:auth] session timer armed for ${remaining.inMinutes}m '
+        '[vivrant:auth] idle timer armed for ${remaining.inMinutes}m '
         '${remaining.inSeconds % 60}s',
       );
     }
     _sessionTimer = Timer(remaining, () {
       unawaited(_expireSession());
     });
+
+    if (remaining <= sessionIdleWarnBefore) {
+      _startIdleTick();
+    } else {
+      if (state.idleWarningSeconds != null) {
+        state = state.copyWith(clearIdleWarning: true);
+      }
+      _warnArmTimer = Timer(remaining - sessionIdleWarnBefore, _startIdleTick);
+    }
+  }
+
+  void _startIdleTick() {
+    _idleTickTimer?.cancel();
+    if (state.status != AuthStatus.authenticated) return;
+    void tick() {
+      if (state.status != AuthStatus.authenticated) {
+        _idleTickTimer?.cancel();
+        return;
+      }
+      final rem = _client.sessionTimeRemaining;
+      if (rem <= Duration.zero) {
+        unawaited(_expireSession());
+        return;
+      }
+      if (rem <= sessionIdleWarnBefore) {
+        final seconds = rem.inSeconds.clamp(1, sessionIdleWarnBefore.inSeconds);
+        if (state.idleWarningSeconds != seconds) {
+          state = state.copyWith(idleWarningSeconds: seconds);
+        }
+      } else if (state.idleWarningSeconds != null) {
+        state = state.copyWith(clearIdleWarning: true);
+      }
+    }
+
+    tick();
+    _idleTickTimer = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+  }
+
+  /// Resets the idle clock on user interaction (taps, scrolls, etc.).
+  void noteUserActivity() {
+    if (state.status != AuthStatus.authenticated) return;
+    final now = DateTime.now();
+    if (_lastActivityNoteAt != null &&
+        now.difference(_lastActivityNoteAt!) < const Duration(seconds: 1)) {
+      return;
+    }
+    _lastActivityNoteAt = now;
+    unawaited(_client.touchActivity());
+    _armSessionTimer();
+  }
+
+  /// Explicit stay-signed-in from the idle warning banner.
+  void staySignedIn() {
+    if (state.status != AuthStatus.authenticated) return;
+    _lastActivityNoteAt = null;
+    noteUserActivity();
   }
 
   Future<void> _checkSessionTimeout() async {
@@ -112,9 +189,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _expireSession() async {
     if (state.status != AuthStatus.authenticated) return;
     if (kDebugMode) {
-      debugPrint('[vivrant:auth] absolute session timeout — forcing re-login');
+      debugPrint('[vivrant:auth] idle session timeout — forcing re-login');
     }
     _sessionTimer?.cancel();
+    _warnArmTimer?.cancel();
+    _idleTickTimer?.cancel();
     await _client.clearTokens();
     try {
       if (await ensureSupabaseInitialized()) {
@@ -124,7 +203,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Local tokens already cleared.
     }
     _handleSessionExpired(
-      message: 'Your session expired. Please sign in again.',
+      message: 'Signed out after 10 minutes of inactivity. Please sign in again.',
     );
   }
 
@@ -134,6 +213,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[vivrant:auth] session expired — forcing re-login');
     }
     _sessionTimer?.cancel();
+    _warnArmTimer?.cancel();
+    _idleTickTimer?.cancel();
     // Tear down any Supabase OAuth session as well (best-effort).
     unawaited(() async {
       try {
@@ -200,7 +281,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = AuthState(
           status: AuthStatus.unauthenticated,
           error: onboarded
-              ? 'Your session expired. Please sign in again.'
+              ? 'Signed out after 10 minutes of inactivity. Please sign in again.'
               : 'needs_onboarding',
         );
         return;
@@ -255,7 +336,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (token == null || token.isEmpty) {
         state = state.copyWith(
           status: AuthStatus.unauthenticated,
-          error: 'Sign-in succeeded but no session token was saved. Try again.',
+          error: 'Sign-in didn’t finish. Please try again.',
         );
         return false;
       }
@@ -318,7 +399,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         error:
-            'Supabase not ready. Stop the app and run: flutter run --dart-define-from-file=dart_defines.json',
+            'Google sign-in isn’t available on this build. Please use email instead.',
       );
       return false;
     }
@@ -448,6 +529,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     _sessionTimer?.cancel();
+    _warnArmTimer?.cancel();
+    _idleTickTimer?.cancel();
     await _push.unregister();
     await _api.logout();
     try {

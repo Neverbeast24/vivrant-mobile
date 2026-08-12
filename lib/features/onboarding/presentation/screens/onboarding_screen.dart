@@ -33,7 +33,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     (
       title: 'Ask VIVRΛNT',
       body:
-          'AI coaching for meals, gym plans, grocery lists, spending, weekly stories, and reminders.',
+          'AI coaching for meals, gym plans, grocery lists, spending, weekly summaries, and reminders.',
       icon: Icons.auto_awesome,
     ),
   ];

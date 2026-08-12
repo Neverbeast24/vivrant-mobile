@@ -45,6 +45,16 @@ const gymMuscleFilters = <String>[
   'mobility',
 ];
 
+/// Short beginner-friendly muscle chips; remaining filters stay behind "More".
+const gymMuscleFiltersPrimary = <String>[
+  'all',
+  'legs',
+  'chest',
+  'back',
+  'arms',
+  'core',
+];
+
 String muscleFilterLabel(String value) {
   switch (value) {
     case 'all':

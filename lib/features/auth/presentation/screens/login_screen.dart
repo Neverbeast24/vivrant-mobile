@@ -119,7 +119,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       TextSpan(
                         children: [
                           TextSpan(
-                            text: 'Come back to\n',
+                            text: 'Sign in to\n',
                             style: theme.textTheme.headlineMedium?.copyWith(
                               fontSize: 32,
                               fontWeight: FontWeight.w700,
@@ -128,7 +128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                           ),
                           TextSpan(
-                            text: 'yourself',
+                            text: 'continue',
                             style: GoogleFonts.instrumentSerif(
                               fontSize: 40,
                               fontStyle: FontStyle.italic,
@@ -147,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Sign in to continue your healthier rhythm — nutrition, movement, sleep, and quiet AI guidance.',
+                      'Track meals, workouts, and sleep in one simple place.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: muted,
                         height: 1.5,
@@ -454,7 +454,7 @@ class _BuiltAroundYou extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Four pillars, one daily rhythm.',
+            'Food, movement, sleep, and helpful tips — together.',
             style: GoogleFonts.instrumentSerif(
               fontSize: 16,
               fontStyle: FontStyle.italic,

@@ -94,6 +94,14 @@ extension VivrantProfileApi on VivrantApi {
     );
   }
 
+  /// Refresh health_goals.current_value from the member's live logs.
+  Future<Map<String, dynamic>> refreshGoalProgress() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/goals/refresh-progress',
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
   Future<List<Map<String, dynamic>>> healthHistory() async {
     final res = await _client.get<Map<String, dynamic>>(
       '/api/mobile/health-history',
@@ -122,6 +130,15 @@ extension VivrantProfileApi on VivrantApi {
 
   Future<void> submitSupportTicket(Map<String, dynamic> body) async {
     await _client.post('/api/mobile/support/tickets', data: body);
+  }
+
+  Future<List<Map<String, dynamic>>> listSupportTickets() async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/api/mobile/support/tickets',
+    );
+    return (res.data?['tickets'] as List? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
   }
 
   Future<List<AppNotification>> listNotifications() async {

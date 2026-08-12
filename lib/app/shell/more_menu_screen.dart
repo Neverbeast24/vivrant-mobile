@@ -69,13 +69,13 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
           const VivrantBrand(),
           const SizedBox(height: 24),
           const PageHeader(
-            eyebrow: 'Modules',
-            title: 'Everything',
-            highlight: 'else',
+            eyebrow: 'More',
+            title: 'More',
+            highlight: 'tools',
           ),
           VivrantSearchField(
             controller: _query,
-            hintText: 'Search modules…',
+            hintText: 'Search features…',
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 14),
@@ -102,7 +102,8 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: EmptyState(
-                message: 'No modules found. Try another search or category.',
+                title: 'Nothing found',
+                message: 'Try another word or pick a different category.',
               ),
             )
           else

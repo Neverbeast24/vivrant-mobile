@@ -15,53 +15,133 @@ class InsightsScreen extends ConsumerStatefulWidget {
 }
 
 class _InsightsScreenState extends ConsumerState<InsightsScreen> {
-  String? _insight;
-  bool _loading = false;
+  List<Map<String, dynamic>> _insights = [];
+  bool _loading = true;
+  bool _generating = false;
+  String? _error;
 
-  Future<void> _generate() async {
-    setState(() => _loading = true);
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final res = await ref.read(vivrantApiProvider).generateInsight();
+      final items = await ref.read(vivrantApiProvider).listInsights();
       if (!mounted) return;
       setState(() {
-        _insight = formatAiResponse(
-          res,
-          keys: const ['insight', 'summary', 'advice'],
-        );
+        _insights = items;
+        _loading = false;
       });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = apiErrorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _generate() async {
+    setState(() => _generating = true);
+    try {
+      await ref.read(vivrantApiProvider).generateInsight();
+      if (!mounted) return;
+      final items = await ref.read(vivrantApiProvider).listInsights();
+      if (!mounted) return;
+      setState(() {
+        _insights = items;
+        _error = null;
+      });
+      context.showSuccess('Insight generated');
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _generating = false);
     }
+  }
+
+  String _bodyOf(Map<String, dynamic> item) {
+    final direct = item['body']?.toString();
+    if (direct != null && direct.trim().isNotEmpty) return direct;
+    return formatAiResponse(
+      item,
+      keys: const ['insight', 'summary', 'advice', 'body'],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Insights')),
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const PageHeader(
-            eyebrow: 'AI',
-            title: 'Personal',
-            highlight: 'insight',
-          ),
-          ElevatedButton.icon(
-            onPressed: _loading ? null : _generate,
-            icon: const Icon(Icons.auto_awesome),
-            label: Text(_loading ? 'Generating…' : 'Generate insight'),
-          ),
-          if (_insight != null) ...[
-            const SizedBox(height: 16),
-            VivrantPanel(
-              title: 'For you',
-              child: Text(_insight!),
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const PageHeader(
+              eyebrow: 'Ask for help',
+              title: 'Saved',
+              highlight: 'insights',
             ),
+            ElevatedButton.icon(
+              onPressed: _generating ? null : _generate,
+              icon: const Icon(Icons.auto_awesome),
+              label: Text(_generating ? 'Generating…' : 'Generate insight'),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              EmptyState(
+                message: _error!,
+                action: OutlinedButton(
+                  onPressed: _load,
+                  child: const Text('Retry'),
+                ),
+              )
+            else if (_insights.isEmpty)
+              const EmptyState(
+                message:
+                    'No insights yet — generate your first recommendation.',
+              )
+            else
+              ..._insights.map((item) {
+                final title = item['title']?.toString() ?? 'Insight';
+                final score = item['score'];
+                final body = _bodyOf(item);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: VivrantPanel(
+                    title: title,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (score != null)
+                          Text(
+                            'Score $score/100',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        if (body.isNotEmpty) ...[
+                          if (score != null) const SizedBox(height: 8),
+                          Text(body),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
           ],
-        ],
+        ),
       ),
     );
   }

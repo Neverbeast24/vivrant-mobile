@@ -7,11 +7,15 @@ import '../../config/env.dart';
 
 const _tokenKey = 'vivrant_access_token';
 const _refreshKey = 'vivrant_refresh_token';
-const _sessionStartedKey = 'vivrant_session_started_at';
+const _lastActivityKey = 'vivrant_session_last_activity_at';
+const _legacySessionStartedKey = 'vivrant_session_started_at';
 
-/// Absolute session lifetime before the user must sign in again.
-/// Silent token refresh does not extend this window.
-const sessionMaxAge = Duration(minutes: 15);
+/// Sign the user out after this much time with no interaction.
+/// Silent token refresh does not extend this window — only user activity does.
+const sessionIdleTimeout = Duration(minutes: 10);
+
+/// Show a stay-signed-in warning this long before idle logout.
+const sessionIdleWarnBefore = Duration(seconds: 90);
 
 final secureStorageProvider = Provider<FlutterSecureStorage>(
   (_) => const FlutterSecureStorage(
@@ -177,7 +181,8 @@ class ApiClient {
   /// In-memory copy so requests keep working even if secure-storage races.
   String? _memoryAccessToken;
   String? _memoryRefreshToken;
-  DateTime? _memorySessionStartedAt;
+  DateTime? _memoryLastActivityAt;
+  DateTime? _lastPersistedActivityAt;
 
   /// Shared in-flight refresh so concurrent 401s only hit the endpoint once.
   Future<_RefreshOutcome>? _refreshInFlight;
@@ -185,21 +190,22 @@ class ApiClient {
   /// Called when a protected request gets 401 and the session was cleared.
   void Function()? onSessionExpired;
 
-  /// UTC timestamp when the current login session began (null if logged out).
-  DateTime? get sessionStartedAt => _memorySessionStartedAt;
+  /// UTC timestamp of the last recorded user activity (null if logged out).
+  DateTime? get lastActivityAt => _memoryLastActivityAt;
 
-  /// Remaining time until forced re-login, or [Duration.zero] if already due.
+  /// Remaining idle time until forced re-login, or [Duration.zero] if already due.
   Duration get sessionTimeRemaining {
-    final started = _memorySessionStartedAt;
-    if (started == null) return Duration.zero;
-    final remaining = sessionMaxAge - DateTime.now().toUtc().difference(started);
+    final last = _memoryLastActivityAt;
+    if (last == null) return Duration.zero;
+    final remaining =
+        sessionIdleTimeout - DateTime.now().toUtc().difference(last);
     return remaining.isNegative ? Duration.zero : remaining;
   }
 
   bool get isSessionExpired {
-    final started = _memorySessionStartedAt;
-    if (started == null) return false;
-    return DateTime.now().toUtc().difference(started) >= sessionMaxAge;
+    final last = _memoryLastActivityAt;
+    if (last == null) return false;
+    return DateTime.now().toUtc().difference(last) >= sessionIdleTimeout;
   }
 
   Dio get dio => _dio;
@@ -238,7 +244,7 @@ class ApiClient {
     if (isSessionExpired) {
       if (kDebugMode) {
         debugPrint(
-          '[vivrant:api] refresh blocked — session older than $sessionMaxAge',
+          '[vivrant:api] refresh blocked — idle longer than $sessionIdleTimeout',
         );
       }
       // Leave clearing to the 401 interceptor so onSessionExpired still fires.
@@ -318,7 +324,7 @@ class ApiClient {
       await _storage.write(key: _refreshKey, value: refreshToken);
     }
     if (startNewSession) {
-      await _writeSessionStart(DateTime.now().toUtc());
+      await touchActivity(forcePersist: true);
     }
     if (kDebugMode) {
       debugPrint(
@@ -330,31 +336,47 @@ class ApiClient {
 
   Future<String?> get accessToken => _resolveAccessToken();
 
-  /// Loads (or migrates) the session-start clock from secure storage.
+  /// Loads (or migrates) the last-activity clock from secure storage.
   /// Existing installs without a stamp get a fresh clock so they are not
   /// logged out immediately after upgrading.
   Future<void> loadSessionClock() async {
-    if (_memorySessionStartedAt != null) return;
-    final raw = await _storage.read(key: _sessionStartedKey);
+    if (_memoryLastActivityAt != null) return;
+    final raw = await _storage.read(key: _lastActivityKey) ??
+        await _storage.read(key: _legacySessionStartedKey);
     if (raw != null && raw.isNotEmpty) {
       final millis = int.tryParse(raw);
       if (millis != null) {
-        _memorySessionStartedAt =
-            DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+        final at = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+        _memoryLastActivityAt = at;
+        _lastPersistedActivityAt = at;
+        // Migrate legacy absolute-session stamp to the idle-activity key.
+        if (await _storage.read(key: _lastActivityKey) == null) {
+          await _storage.write(key: _lastActivityKey, value: raw);
+          await _storage.delete(key: _legacySessionStartedKey);
+        }
         return;
       }
     }
     final token = await _resolveAccessToken();
     if (token != null && token.isNotEmpty) {
-      await _writeSessionStart(DateTime.now().toUtc());
+      await touchActivity(forcePersist: true);
     }
   }
 
-  Future<void> _writeSessionStart(DateTime startedAt) async {
-    _memorySessionStartedAt = startedAt;
+  /// Records user activity so the idle timeout window resets.
+  /// Persists at most every 30s to avoid hammering secure storage.
+  Future<void> touchActivity({bool forcePersist = false}) async {
+    final now = DateTime.now().toUtc();
+    _memoryLastActivityAt = now;
+    final lastPersisted = _lastPersistedActivityAt;
+    final shouldPersist = forcePersist ||
+        lastPersisted == null ||
+        now.difference(lastPersisted) >= const Duration(seconds: 30);
+    if (!shouldPersist) return;
+    _lastPersistedActivityAt = now;
     await _storage.write(
-      key: _sessionStartedKey,
-      value: startedAt.millisecondsSinceEpoch.toString(),
+      key: _lastActivityKey,
+      value: now.millisecondsSinceEpoch.toString(),
     );
   }
 
@@ -368,10 +390,12 @@ class ApiClient {
     }
     _memoryAccessToken = null;
     _memoryRefreshToken = null;
-    _memorySessionStartedAt = null;
+    _memoryLastActivityAt = null;
+    _lastPersistedActivityAt = null;
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshKey);
-    await _storage.delete(key: _sessionStartedKey);
+    await _storage.delete(key: _lastActivityKey);
+    await _storage.delete(key: _legacySessionStartedKey);
     return true;
   }
 
