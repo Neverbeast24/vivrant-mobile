@@ -17,4 +17,5 @@ export 'progress_bar.dart';
 export 'score_picker.dart';
 export 'search_field.dart';
 export 'section_label.dart';
+export 'share_export_sheet.dart';
 export 'stat_card.dart';

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -134,6 +135,8 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                       onPressed: () => context.pop(),
                       icon: const Icon(Icons.arrow_back_rounded),
                     ),
+                  if (_items.isNotEmpty)
+                    ShareExportButton(doc: movementWorkoutsDoc(_items)),
                   IconButton(
                     onPressed: () => context.push('/move/log'),
                     icon: const Icon(Icons.add_circle_outline),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/module_cache.dart';
@@ -81,7 +82,13 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final water = (_data?['water_ml'] as num?)?.toInt() ?? 0;
 
     return GradientScaffold(
-      appBar: AppBar(title: const Text('Reports')),
+      appBar: AppBar(
+        title: const Text('Reports'),
+        actions: [
+          if (_data != null)
+            ShareExportButton(doc: reportsDoc(_data!, story: _story)),
+        ],
+      ),
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

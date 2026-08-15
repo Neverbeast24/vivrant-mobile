@@ -6,6 +6,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/utils/humanize.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -155,6 +156,7 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
       appBar: AppBar(
         title: const Text('Pantry'),
         actions: [
+          if (_items.isNotEmpty) ShareExportButton(doc: pantryDoc(_items)),
           IconButton(
             tooltip: 'Add pantry item',
             onPressed: () => context.push('/pantry/add'),

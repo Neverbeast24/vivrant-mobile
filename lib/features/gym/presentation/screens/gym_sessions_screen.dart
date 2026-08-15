@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -210,6 +211,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
       appBar: AppBar(
         title: const Text('Workouts'),
         actions: [
+          if (_items.isNotEmpty) ShareExportButton(doc: gymSessionsDoc(_items)),
           IconButton(
             onPressed: _log,
             icon: const Icon(Icons.add),

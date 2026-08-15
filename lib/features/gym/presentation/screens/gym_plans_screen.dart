@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
@@ -169,7 +170,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             avoidTargets: _avoidTargets.toList(),
           );
       if (!mounted) return;
-      context.showSuccess('Your plan is ready');
+      context.showSuccess('Your program is ready');
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -297,8 +298,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     final theme = Theme.of(context);
     return GradientScaffold(
       appBar: AppBar(
-        title: const Text('Training plans'),
+        title: const Text('Training program'),
         actions: [
+          if (_plans.isNotEmpty)
+            ShareExportButton(doc: gymPlansDoc(_plans)),
           IconButton(
             onPressed: _generating ? null : _createAi,
             icon: _generating
@@ -319,10 +322,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             const PageHeader(
               eyebrow: 'Gym',
               title: 'Training',
-              highlight: 'plans',
+              highlight: 'program',
             ),
             Text(
-              'Create a simple weekly plan that fits your schedule.',
+              'Create a simple weekly program that fits your schedule.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
@@ -338,7 +341,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Choose days and minutes, then create a plan. Extra options are optional.',
+                    'Choose days and minutes, then create a program. Extra options are optional.',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
@@ -376,7 +379,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                       onPressed: _generating ? null : _createAi,
                       icon: const Icon(Icons.auto_awesome),
                       label: Text(
-                        _generating ? 'Creating your plan…' : 'Create my plan',
+                        _generating ? 'Creating your program…' : 'Create my program',
                       ),
                     ),
                   ),
@@ -434,7 +437,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Optional: mark exercises you know so your plan can prefer them.',
+                      'Optional: mark exercises you know so your program can prefer them.',
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
@@ -569,17 +572,17 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               )
             else if (_plans.isEmpty)
               EmptyState(
-                title: 'No plan yet',
-                message: 'Choose how often you train above, then create a plan.',
+                title: 'No program yet',
+                message: 'Choose how often you train above, then create a program.',
                 action: ElevatedButton(
                   onPressed: _generating ? null : _createAi,
-                  child: const Text('Create my plan'),
+                  child: const Text('Create my program'),
                 ),
               )
             else ...[
               VivrantSearchField(
                 controller: _query,
-                hintText: 'Search plans…',
+                hintText: 'Search programs…',
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 14),
@@ -607,7 +610,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               if (filtered.isEmpty)
                 const EmptyState(
                   message:
-                      'No plans match these filters. Try All or another search.',
+                      'No programs match these filters. Try All or another search.',
                 )
               else
                 ...filtered.map((p) => _PlanCard(
@@ -625,6 +628,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                           }
                         });
                       },
+                      onShare: () => showShareExportSheet(context, gymPlanDoc(p)),
                       onDelete: () async {
                         final id = (p['id'] as num).toInt();
                         try {
@@ -639,7 +643,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                           ref
                               .read(moduleCacheProvider)
                               .write(ModuleCacheKeys.gymPlans, _plans);
-                          context.showSuccess('Plan removed');
+                          context.showSuccess('Program removed');
                         } catch (e) {
                           if (!mounted) return;
                           context.showError(apiErrorMessage(e));
@@ -794,6 +798,7 @@ class _PlanCard extends StatelessWidget {
     required this.exercises,
     required this.expanded,
     required this.onToggleExpand,
+    required this.onShare,
     required this.onDelete,
   });
 
@@ -801,12 +806,14 @@ class _PlanCard extends StatelessWidget {
   final List<GymExercise> exercises;
   final bool expanded;
   final VoidCallback onToggleExpand;
+  final VoidCallback onShare;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final daysPerWeek = plan['days_per_week'] ?? (plan['days'] is List ? (plan['days'] as List).length : null);
     final summary = plan['summary']?.toString();
+    final recs = programRecommendations(plan);
     final days = (plan['days'] as List? ?? const [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
@@ -825,11 +832,11 @@ class _PlanCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        plan['title']?.toString() ?? 'Plan',
+                        plan['title']?.toString() ?? 'Program',
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                       Text(
-                        '${humanizeLabel(plan['focus']?.toString() ?? 'plan')} · ${plan['level'] ?? '—'} · ${daysPerWeek ?? '—'} days/wk',
+                        '${humanizeLabel(plan['focus']?.toString() ?? 'program')} · ${plan['level'] ?? '—'} · ${daysPerWeek ?? '—'} days/wk',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -841,6 +848,11 @@ class _PlanCard extends StatelessWidget {
                   icon: Icon(expanded ? Icons.expand_less : Icons.expand_more),
                 ),
                 IconButton(
+                  tooltip: 'Share or export',
+                  icon: const Icon(Icons.ios_share_rounded),
+                  onPressed: onShare,
+                ),
+                IconButton(
                   icon: const Icon(Icons.delete_outline),
                   onPressed: onDelete,
                 ),
@@ -849,6 +861,37 @@ class _PlanCard extends StatelessWidget {
             if (summary != null && summary.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(summary, style: Theme.of(context).textTheme.bodySmall),
+            ],
+            if (recs.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Recommendations',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              for (final rec in recs)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          rec,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
             if (expanded && days.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -863,19 +906,33 @@ class _PlanCard extends StatelessWidget {
                     builder: (context) {
                       final ex = Map<String, dynamic>.from(raw as Map);
                       final name = ex['name']?.toString() ?? 'Movement';
+                      final notes = ex['notes']?.toString() ?? '';
                       final linked = findExerciseMatch(name, exercises);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (linked != null) ...[
                               _KnownExerciseThumb(exercise: linked, size: 32),
                               const SizedBox(width: 8),
                             ],
                             Expanded(
-                              child: Text(
-                                '$name · ${ex['sets'] ?? ''} · rest ${ex['rest'] ?? ''}',
-                                style: Theme.of(context).textTheme.bodySmall,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    formatGymExerciseLine(ex),
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  if (notes.isNotEmpty)
+                                    Text(
+                                      notes,
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            fontSize: 11,
+                                          ),
+                                    ),
+                                ],
                               ),
                             ),
                             if (linked != null && linked.hasDemo)

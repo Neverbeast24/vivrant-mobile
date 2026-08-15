@@ -6,6 +6,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/module_cache.dart';
@@ -214,6 +215,8 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
       appBar: AppBar(
         title: const Text('Health history'),
         actions: [
+          if (_entries.isNotEmpty)
+            ShareExportButton(doc: healthHistoryDoc(_entries)),
           IconButton(
             onPressed: _add,
             tooltip: 'Add entry',

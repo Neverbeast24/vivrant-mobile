@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -353,6 +354,7 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
       appBar: AppBar(
         title: const Text('Groceries'),
         actions: [
+          if (_items.isNotEmpty) ShareExportButton(doc: groceryListDoc(_items)),
           IconButton(onPressed: _add, icon: const Icon(Icons.add)),
         ],
       ),

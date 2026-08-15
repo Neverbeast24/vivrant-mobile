@@ -6,6 +6,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/utils/humanize.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -115,6 +116,8 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
       appBar: AppBar(
         title: const Text('Spending'),
         actions: [
+          if (_expenses.isNotEmpty)
+            ShareExportButton(doc: expensesDoc(_expenses)),
           IconButton(
             onPressed: () => context.push('/spending/budget'),
             icon: const Icon(Icons.pie_chart_outline),

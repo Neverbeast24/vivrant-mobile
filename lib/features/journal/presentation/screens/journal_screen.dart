@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -136,7 +137,13 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
   Widget build(BuildContext context) {
     final filtered = _filtered;
     return GradientScaffold(
-      appBar: AppBar(title: const Text('Journal')),
+      appBar: AppBar(
+        title: const Text('Journal'),
+        actions: [
+          if (_entries.isNotEmpty)
+            ShareExportButton(doc: journalEntriesDoc(_entries)),
+        ],
+      ),
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -245,6 +252,12 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                                 ),
                               ],
                             ),
+                          ),
+                          IconButton(
+                            tooltip: 'Share or export',
+                            icon: const Icon(Icons.ios_share_rounded),
+                            onPressed: () =>
+                                showShareExportSheet(context, journalNoteDoc(e)),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline),

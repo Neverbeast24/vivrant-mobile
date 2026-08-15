@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -223,6 +224,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
       appBar: AppBar(
         title: const Text('Goals'),
         actions: [
+          if (_goals.isNotEmpty) ShareExportButton(doc: goalsDoc(_goals)),
           IconButton(
             onPressed: _add,
             tooltip: 'Add goal',

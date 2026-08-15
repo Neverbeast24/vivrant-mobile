@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -120,10 +121,17 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
               eyebrow: 'Nutrition',
               title: 'Meals &',
               highlight: 'macros',
-              trailing: IconButton(
-                tooltip: 'Log meal',
-                onPressed: () => context.push('/nutrition/log'),
-                icon: const Icon(Icons.add_circle_outline),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_meals.isNotEmpty)
+                    ShareExportButton(doc: mealsDoc(_meals)),
+                  IconButton(
+                    tooltip: 'Log meal',
+                    onPressed: () => context.push('/nutrition/log'),
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ],
               ),
             ),
             StatCard(
