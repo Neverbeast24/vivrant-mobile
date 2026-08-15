@@ -147,7 +147,7 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 20),
                     child: Text(
-                      'Start with demos, then log sessions and build a plan when you are ready.',
+                      'Start with demos, then log sessions and build a program when you are ready.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: muted,
                         height: 1.45,
@@ -230,7 +230,7 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
                       ),
                       GymNavCard(
                         icon: Icons.auto_awesome_rounded,
-                        label: 'Training plans',
+                        label: 'Training program',
                         caption: plans > 0
                             ? '$plans saved program${plans == 1 ? '' : 's'}'
                             : 'AI programs & routines',

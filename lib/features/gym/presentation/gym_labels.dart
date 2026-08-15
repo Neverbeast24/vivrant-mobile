@@ -152,6 +152,43 @@ GymExercise? findExerciseMatch(String name, List<GymExercise> exercises) {
   return null;
 }
 
+List<String> programRecommendations(Map<String, dynamic> plan) {
+  final top = plan['recommendations'];
+  if (top is List) {
+    return top
+        .map((e) => e.toString().trim())
+        .where((e) => e.length >= 2)
+        .take(8)
+        .toList();
+  }
+  final days = plan['days'];
+  if (days is List && days.isNotEmpty && days.first is Map) {
+    final recs = Map<String, dynamic>.from(days.first as Map)['recommendations'];
+    if (recs is List) {
+      return recs
+          .map((e) => e.toString().trim())
+          .where((e) => e.length >= 2)
+          .take(8)
+          .toList();
+    }
+  }
+  return const [];
+}
+
+String formatGymExerciseLine(Map<String, dynamic> ex) {
+  final name = ex['name']?.toString() ?? 'Movement';
+  final sets = ex['sets']?.toString() ?? '';
+  final rest = ex['rest']?.toString() ?? '';
+  final weight = ex['weight']?.toString().trim() ?? '';
+  final parts = <String>[
+    name,
+    if (sets.isNotEmpty) sets,
+    if (weight.isNotEmpty) weight,
+    if (rest.isNotEmpty) 'rest $rest',
+  ];
+  return parts.join(' · ');
+}
+
 IconData muscleIcon(String muscleGroup) {
   switch (muscleGroup) {
     case 'core':

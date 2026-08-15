@@ -40,7 +40,7 @@ class TrainingHubScreen extends StatelessWidget {
           ModuleTile(
             icon: Icons.fitness_center,
             label: 'Gym',
-            caption: 'Videos, machines, workouts, and plans',
+            caption: 'Videos, machines, workouts, and programs',
             onTap: () => context.push('/gym'),
           ),
         ],
