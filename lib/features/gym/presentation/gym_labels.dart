@@ -189,6 +189,69 @@ String formatGymExerciseLine(Map<String, dynamic> ex) {
   return parts.join(' · ');
 }
 
+List<Map<String, String>> dayAlternatives(Map<String, dynamic> day) {
+  final raw = day['alternatives'];
+  if (raw is! List) return const [];
+  final out = <Map<String, String>>[];
+  final seen = <String>{};
+  for (final item in raw) {
+    var insteadOf = '';
+    var use = '';
+    if (item is String) {
+      final text = item.trim();
+      final instead = RegExp(r'^(.+?)\s+instead of\s+(.+)$', caseSensitive: false)
+          .firstMatch(text);
+      final arrow = RegExp(r'^(.+?)\s*(?:→|->)\s*(.+)$').firstMatch(text);
+      if (instead != null) {
+        use = instead.group(1)!.trim();
+        insteadOf = instead.group(2)!.trim();
+      } else if (arrow != null) {
+        insteadOf = arrow.group(1)!.trim();
+        use = arrow.group(2)!.trim();
+      }
+    } else if (item is Map) {
+      final row = Map<String, dynamic>.from(item);
+      insteadOf = (row['instead_of'] ?? row['from'] ?? '').toString().trim();
+      use = (row['use'] ?? row['to'] ?? row['name'] ?? '').toString().trim();
+    }
+    if (insteadOf.length < 2 || use.length < 2) continue;
+    final key = '${insteadOf.toLowerCase()}=>${use.toLowerCase()}';
+    if (seen.contains(key)) continue;
+    seen.add(key);
+    out.add({'instead_of': insteadOf, 'use': use});
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
+List<Map<String, String>> dayAdditionals(Map<String, dynamic> day) {
+  final raw = day['additionals'];
+  if (raw is! List) return const [];
+  final out = <Map<String, String>>[];
+  final seen = <String>{};
+  for (final item in raw) {
+    var name = '';
+    var sets = '';
+    if (item is String) {
+      name = item.trim();
+    } else if (item is Map) {
+      final row = Map<String, dynamic>.from(item);
+      name = (row['name'] ?? row['use'] ?? '').toString().trim();
+      sets = (row['sets'] ?? '').toString().trim();
+    }
+    if (name.length < 2) continue;
+    final key = name.toLowerCase();
+    if (seen.contains(key)) continue;
+    seen.add(key);
+    out.add({
+      'name': name,
+      if (sets.isNotEmpty) 'sets': sets,
+    });
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
 IconData muscleIcon(String muscleGroup) {
   switch (muscleGroup) {
     case 'core':

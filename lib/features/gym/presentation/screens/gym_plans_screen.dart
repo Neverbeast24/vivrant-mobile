@@ -865,7 +865,7 @@ class _PlanCard extends StatelessWidget {
             if (recs.isNotEmpty) ...[
               const SizedBox(height: 10),
               Text(
-                'Recommendations',
+                'Coach notes',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -945,6 +945,70 @@ class _PlanCard extends StatelessWidget {
                       );
                     },
                   ),
+                if (dayAlternatives(day).isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Alternatives',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  for (final swap in dayAlternatives(day))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.swap_horiz_rounded,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${swap['use']} instead of ${swap['instead_of']}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+                if (dayAdditionals(day).isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Add-ons',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  for (final addon in dayAdditionals(day))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.add_circle_outline_rounded,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              addon['sets'] != null && addon['sets']!.isNotEmpty
+                                  ? '${addon['name']} · ${addon['sets']}'
+                                  : addon['name'] ?? '',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
                 const SizedBox(height: 10),
               ],
             ],

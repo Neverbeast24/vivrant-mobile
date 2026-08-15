@@ -76,7 +76,7 @@ ShareExportDoc gymPlanDoc(Map<String, dynamic> plan) {
     if (summary != null && summary.isNotEmpty) '',
     if (summary != null && summary.isNotEmpty) summary,
     if (recs.isNotEmpty) '',
-    if (recs.isNotEmpty) 'Recommendations',
+    if (recs.isNotEmpty) 'Coach notes',
     ...recs.map((rec) => '• $rec'),
     '',
   ];
@@ -104,6 +104,26 @@ ShareExportDoc gymPlanDoc(Map<String, dynamic> plan) {
       ].join(' · ');
       lines.add('• $name · $extras');
       csvRows.add([dayLabel, dayFocus, name, sets, weight, rest, notes]);
+    }
+    final alts = day['alternatives'];
+    if (alts is List) {
+      for (final item in alts.whereType<Map>()) {
+        final row = Map<String, dynamic>.from(item);
+        final insteadOf = (row['instead_of'] ?? '').toString();
+        final use = (row['use'] ?? '').toString();
+        if (insteadOf.isEmpty && use.isEmpty) continue;
+        lines.add('  Alternative: $use instead of $insteadOf');
+      }
+    }
+    final adds = day['additionals'];
+    if (adds is List) {
+      for (final item in adds.whereType<Map>()) {
+        final row = Map<String, dynamic>.from(item);
+        final name = (row['name'] ?? '').toString();
+        final sets = (row['sets'] ?? '').toString();
+        if (name.isEmpty) continue;
+        lines.add('  Add-on: $name${sets.isNotEmpty ? ' · $sets' : ''}');
+      }
     }
     lines.add('');
   }
