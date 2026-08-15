@@ -814,10 +814,13 @@ class _PlanCard extends StatelessWidget {
     final daysPerWeek = plan['days_per_week'] ?? (plan['days'] is List ? (plan['days'] as List).length : null);
     final summary = plan['summary']?.toString();
     final recs = programRecommendations(plan);
-    final days = (plan['days'] as List? ?? const [])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final days = enrichPlanDays(
+      (plan['days'] as List? ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
+      exercises,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -892,6 +895,42 @@ class _PlanCard extends StatelessWidget {
                     ],
                   ),
                 ),
+            ],
+            if (days.any(
+              (day) =>
+                  dayAlternatives(day).isNotEmpty || dayAdditionals(day).isNotEmpty,
+            )) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Suggestions to add',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'If a machine is busy or you have extra minutes, use these swaps and extras.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              for (final day in days)
+                if (dayAlternatives(day).isNotEmpty || dayAdditionals(day).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      '${day['day'] ?? 'Day'}: ${[
+                        ...dayAlternatives(day).map(
+                          (swap) => '${swap['use']} instead of ${swap['instead_of']}',
+                        ),
+                        ...dayAdditionals(day).map(
+                          (addon) => addon['sets'] != null && addon['sets']!.isNotEmpty
+                              ? 'add ${addon['name']} (${addon['sets']})'
+                              : 'add ${addon['name']}',
+                        ),
+                      ].join(' · ')}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
             ],
             if (expanded && days.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -979,7 +1018,7 @@ class _PlanCard extends StatelessWidget {
                 if (dayAdditionals(day).isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Add-ons',
+                    'Add to this workout',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),

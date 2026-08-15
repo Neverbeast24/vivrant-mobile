@@ -252,6 +252,121 @@ List<Map<String, String>> dayAdditionals(Map<String, dynamic> day) {
   return out;
 }
 
+const _addonComplement = <String, List<String>>{
+  'back': ['shoulders', 'arms', 'core'],
+  'chest': ['arms', 'shoulders', 'core'],
+  'shoulders': ['arms', 'core'],
+  'traps': ['back', 'shoulders'],
+  'arms': ['shoulders', 'core'],
+  'forearms': ['arms'],
+  'legs': ['calves', 'hamstrings', 'core', 'inner_thighs'],
+  'hamstrings': ['calves', 'core', 'legs'],
+  'inner_thighs': ['calves', 'core', 'legs'],
+  'glutes': ['hamstrings', 'core'],
+  'calves': ['core', 'legs'],
+  'core': ['cardio'],
+  'cardio': ['core', 'mobility'],
+  'lower_back': ['core', 'hamstrings'],
+  'full_body': ['core', 'cardio'],
+  'mobility': ['core'],
+};
+
+String _addonSets(GymExercise item) {
+  if (item.equipment == 'cardio_machine' || item.muscleGroup == 'cardio') {
+    return '8–12 mins easy';
+  }
+  if (item.muscleGroup == 'core' || item.muscleGroup == 'mobility') {
+    return '2 x 12-15';
+  }
+  return '2–3 x 12-15';
+}
+
+List<Map<String, dynamic>> enrichPlanDays(
+  List<Map<String, dynamic>> days,
+  List<GymExercise> catalog,
+) {
+  if (days.isEmpty || catalog.isEmpty) return days;
+  return [
+    for (final day in days) _enrichPlanDay(Map<String, dynamic>.from(day), catalog),
+  ];
+}
+
+Map<String, dynamic> _enrichPlanDay(
+  Map<String, dynamic> day,
+  List<GymExercise> catalog,
+) {
+  final used = <String>{};
+  for (final raw in (day['exercises'] as List? ?? const [])) {
+    if (raw is Map) {
+      final name = (raw['name'] ?? '').toString().toLowerCase();
+      if (name.isNotEmpty) used.add(name);
+    }
+  }
+  final alternatives = dayAlternatives(day);
+  final additionals = dayAdditionals(day);
+  for (final swap in alternatives) {
+    used.add((swap['use'] ?? '').toLowerCase());
+  }
+  for (final addon in additionals) {
+    used.add((addon['name'] ?? '').toLowerCase());
+  }
+
+  final exercises = (day['exercises'] as List? ?? const [])
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+  for (final ex in exercises) {
+    if (alternatives.length >= 3) break;
+    final name = ex['name']?.toString() ?? '';
+    final match = findExerciseMatch(name, catalog);
+    if (match == null) continue;
+    final pool = catalog.where((item) {
+      final key = item.name.toLowerCase();
+      return item.muscleGroup == match.muscleGroup &&
+          key != match.name.toLowerCase() &&
+          !used.contains(key);
+    }).toList();
+    final swapped = pool.where((item) => item.equipment != match.equipment).toList();
+    final pick = swapped.isNotEmpty ? swapped.first : (pool.isNotEmpty ? pool.first : null);
+    if (pick == null) continue;
+    used.add(pick.name.toLowerCase());
+    alternatives.add({'instead_of': name, 'use': pick.name});
+  }
+
+  final dayMuscles = <String>[];
+  for (final ex in exercises) {
+    final match = findExerciseMatch(ex['name']?.toString() ?? '', catalog);
+    if (match != null && !dayMuscles.contains(match.muscleGroup)) {
+      dayMuscles.add(match.muscleGroup);
+    }
+  }
+  final targets = <String>[];
+  for (final muscle in dayMuscles) {
+    for (final next in _addonComplement[muscle] ?? const <String>[]) {
+      if (!targets.contains(next)) targets.add(next);
+    }
+  }
+  for (final muscle in targets) {
+    if (additionals.length >= 2) break;
+    GymExercise? pick;
+    for (final item in catalog) {
+      if (item.muscleGroup == muscle && !used.contains(item.name.toLowerCase())) {
+        pick = item;
+        break;
+      }
+    }
+    if (pick == null) continue;
+    used.add(pick.name.toLowerCase());
+    additionals.add({'name': pick.name, 'sets': _addonSets(pick)});
+  }
+
+  return {
+    ...day,
+    if (alternatives.isNotEmpty) 'alternatives': alternatives,
+    if (additionals.isNotEmpty) 'additionals': additionals,
+  };
+}
+
 IconData muscleIcon(String muscleGroup) {
   switch (muscleGroup) {
     case 'core':
