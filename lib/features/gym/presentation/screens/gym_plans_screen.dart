@@ -821,6 +821,12 @@ class _PlanCard extends StatelessWidget {
           .toList(),
       exercises,
     );
+    final today = pickTodaysPlanDay(days);
+    final todayFirst = (today?['exercises'] as List?)
+        ?.whereType<Map>()
+        .map((e) => e['name']?.toString() ?? '')
+        .where((name) => name.isNotEmpty)
+        .firstOrNull;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -842,6 +848,22 @@ class _PlanCard extends StatelessWidget {
                         '${humanizeLabel(plan['focus']?.toString() ?? 'program')} · ${plan['level'] ?? '—'} · ${daysPerWeek ?? '—'} days/wk',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+                      if (today != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            [
+                              'Today',
+                              today['day']?.toString() ?? '',
+                              humanizeLabel(today['focus']?.toString() ?? ''),
+                              if (todayFirst != null) todayFirst,
+                            ].where((part) => part.isNotEmpty).join(' · '),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

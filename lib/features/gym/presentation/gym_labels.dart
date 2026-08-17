@@ -399,6 +399,36 @@ IconData muscleIcon(String muscleGroup) {
   }
 }
 
+const _weekdayFull = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+const _weekdayShort = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/// Pick the session that should show on Today — weekday name first, else Mon-based rotation.
+/// Mirrors viva-server `pickTodaysPlanDay`.
+Map<String, dynamic>? pickTodaysPlanDay(
+  List<Map<String, dynamic>> days, [
+  DateTime? date,
+]) {
+  if (days.isEmpty) return null;
+  final now = date ?? DateTime.now();
+  final full = _weekdayFull[now.weekday - 1];
+  final short = _weekdayShort[now.weekday - 1];
+  for (final day in days) {
+    final label = (day['day']?.toString() ?? '').toLowerCase();
+    final tokens = label.split(RegExp(r'[\s,/:.-]+')).where((part) => part.isNotEmpty);
+    if (label.contains(full) || tokens.contains(short)) return day;
+  }
+  final mondayIndex = now.weekday == DateTime.sunday ? 6 : now.weekday - 1;
+  return days[mondayIndex % days.length];
+}
+
 Color difficultyColor(String difficulty) {
   switch (difficulty.toLowerCase()) {
     case 'beginner':

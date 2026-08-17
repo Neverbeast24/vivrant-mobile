@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -225,10 +226,111 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              const QuickActionsRow(),
+              _TodayProgramCard(program: _data?['program']),
+              const SizedBox(height: 18),
+              QuickActionsRow(
+                programCaption: _programCaption(_data?['program']),
+                mealsToday: (_data?['meals_today'] as num?)?.toInt() ?? 0,
+                habitsDone: (_data?['habits_done_today'] as num?)?.toInt(),
+                habitsTotal: (_data?['habits_total'] as num?)?.toInt(),
+              ),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+String? _programCaption(Object? raw) {
+  if (raw is! Map) return null;
+  final plan = Map<String, dynamic>.from(raw);
+  final title = plan['title']?.toString().trim();
+  if (title == null || title.isEmpty) return null;
+  final count = (plan['planCount'] as num?)?.toInt() ?? 1;
+  if (count > 1) return '$title · $count saved';
+  return title;
+}
+
+class _TodayProgramCard extends StatelessWidget {
+  const _TodayProgramCard({required this.program});
+
+  final Object? program;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VivrantColors.of(context);
+    final raw = program;
+    final plan = raw is Map ? Map<String, dynamic>.from(raw) : null;
+    final today = plan?['today'] is Map
+        ? Map<String, dynamic>.from(plan!['today'] as Map)
+        : null;
+    final exercises = (today?['exercises'] as List?)
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        const <Map<String, dynamic>>[];
+
+    return VivrantPanel(
+      title: 'Training program',
+      trailing: TextButton(
+        onPressed: () => context.push('/gym/plans'),
+        child: Text(plan == null ? 'Create' : 'Open'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (plan == null)
+            Text(
+              'No program yet. Create a weekly plan and it will show up here every day.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            )
+          else ...[
+            Text(
+              plan['title']?.toString() ?? 'Your program',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              [
+                if ((plan['focus']?.toString() ?? '').isNotEmpty)
+                  humanizeLabel(plan['focus'].toString()),
+                if (plan['daysPerWeek'] != null) '${plan['daysPerWeek']} days/week',
+                if ((plan['planCount'] as num?)?.toInt() != null &&
+                    (plan['planCount'] as num).toInt() > 1)
+                  '${plan['planCount']} saved',
+              ].join(' · '),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: c.ink.withValues(alpha: 0.62),
+                  ),
+            ),
+            if (today != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Today · ${today['day'] ?? ''} · ${humanizeLabel(today['focus']?.toString() ?? '')}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: c.accent,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final ex in exercises.take(4))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    [
+                      ex['name']?.toString() ?? '',
+                      if ((ex['sets']?.toString() ?? '').isNotEmpty) ex['sets'],
+                    ].where((part) => (part ?? '').toString().isNotEmpty).join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+            ],
+          ],
+        ],
       ),
     );
   }
