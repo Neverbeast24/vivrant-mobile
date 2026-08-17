@@ -41,6 +41,7 @@ extension VivrantGymApi on VivrantApi {
   Future<Map<String, dynamic>> createAiGymPlan({
     int? daysPerWeek,
     int? sessionMinutes,
+    String? level,
     List<String>? knownMachineSlugs,
     List<String>? knownCustomExercises,
     List<String>? avoidTargets,
@@ -50,6 +51,7 @@ extension VivrantGymApi on VivrantApi {
       data: {
         if (daysPerWeek != null) 'days_per_week': daysPerWeek,
         if (sessionMinutes != null) 'session_minutes': sessionMinutes,
+        if (level != null && level.isNotEmpty) 'level': level,
         if (knownMachineSlugs != null && knownMachineSlugs.isNotEmpty)
           'known_machine_slugs': knownMachineSlugs,
         if (knownCustomExercises != null && knownCustomExercises.isNotEmpty)

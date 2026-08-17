@@ -302,11 +302,14 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 {
   "days_per_week": 3,
   "session_minutes": 45,
+  "level": "beginner",
   "known_machine_slugs": ["leg-press", "stiff-leg-deadlift"],
   "known_custom_exercises": ["Hip thrust"],
   "avoid_targets": ["core", "lower_back"]
 }
 ```
+
+`level` allowlist: `beginner`, `intermediate`, `advanced` (defaults to `beginner`). Working loads are scaled from profile body weight using this level.
 
 `avoid_targets` allowlist: `core`, `arms`, `forearms`, `shoulders`, `chest`, `back`, `traps`, `legs`, `glutes`, `hamstrings`, `calves`, `inner_thighs`, `lower_back`, `cardio`, `mobility`.
 

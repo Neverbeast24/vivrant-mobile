@@ -5,6 +5,15 @@ import '../../../shared/models/gym_exercise.dart';
 
 export '../../../core/utils/humanize.dart' show humanizeLabel;
 
+/// Mirrors web `GYM_PLAN_LEVELS` for AI gym plan prefs.
+const gymPlanLevels = <String>['beginner', 'intermediate', 'advanced'];
+
+String sanitizeGymPlanLevel(String? input) {
+  final value = (input ?? '').trim().toLowerCase();
+  if (value == 'intermediate' || value == 'advanced') return value;
+  return 'beginner';
+}
+
 /// Mirrors web `GYM_AVOID_TARGETS` for AI gym plan prefs.
 const gymAvoidTargets = <String>[
   'core',
@@ -49,11 +58,17 @@ const gymMuscleFilters = <String>[
 const gymMuscleFiltersPrimary = <String>[
   'all',
   'legs',
+  'glutes',
   'chest',
   'back',
+  'shoulders',
   'arms',
   'core',
+  'cardio',
 ];
+
+/// Mirrors web `MAX_KNOWN_MACHINE_SLUGS`.
+const maxKnownMachineSlugs = 250;
 
 String muscleFilterLabel(String value) {
   switch (value) {
@@ -79,7 +94,7 @@ List<String> sanitizeKnownMachineSlugs(Iterable<String> input) {
     if (slug.isEmpty || slug.length > 80 || seen.contains(slug)) continue;
     seen.add(slug);
     out.add(slug);
-    if (out.length >= 60) break;
+    if (out.length >= maxKnownMachineSlugs) break;
   }
   return out;
 }

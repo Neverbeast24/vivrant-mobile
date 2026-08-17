@@ -24,6 +24,7 @@ class GymPlansScreen extends ConsumerStatefulWidget {
 class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   static const _prefsDaysKey = 'vivrant.gym.plan.days';
   static const _prefsSessionKey = 'vivrant.gym.plan.session';
+  static const _prefsLevelKey = 'vivrant.gym.plan.level';
   static const _prefsKnownKey = 'vivrant.gym.knownMachines';
   static const _prefsCustomKey = 'vivrant.gym.knownCustom';
   static const _prefsAvoidKey = 'vivrant.gym.avoidTargets';
@@ -40,6 +41,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   final List<String> _customExercises = [];
   final Set<String> _avoidTargets = {};
   final Set<int> _expanded = {};
+  String _level = 'beginner';
 
   bool _loading = true;
   bool _generating = false;
@@ -77,9 +79,11 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     if (!mounted) return;
     final days = int.tryParse(prefs.getString(_prefsDaysKey) ?? '') ?? 3;
     final session = int.tryParse(prefs.getString(_prefsSessionKey) ?? '') ?? 45;
+    final level = sanitizeGymPlanLevel(prefs.getString(_prefsLevelKey));
     setState(() {
       _daysCtrl.text = days.clamp(2, 6).toString();
       _sessionCtrl.text = session.clamp(15, 120).toString();
+      _level = level;
       _knownSlugs
         ..clear()
         ..addAll(sanitizeKnownMachineSlugs(prefs.getStringList(_prefsKnownKey) ?? const []));
@@ -115,6 +119,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     }
     await prefs.setString(_prefsDaysKey, _daysPerWeek.toString());
     await prefs.setString(_prefsSessionKey, _sessionMinutes.toString());
+    await prefs.setString(_prefsLevelKey, _level);
     await prefs.setStringList(_prefsKnownKey, known);
     await prefs.setStringList(_prefsCustomKey, customs);
     await prefs.setStringList(_prefsAvoidKey, avoids);
@@ -165,6 +170,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       await ref.read(vivrantApiProvider).createAiGymPlan(
             daysPerWeek: _daysPerWeek,
             sessionMinutes: _sessionMinutes,
+            level: _level,
             knownMachineSlugs: _knownSlugs.toList(),
             knownCustomExercises: List<String>.from(_customExercises),
             avoidTargets: _avoidTargets.toList(),
@@ -203,7 +209,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     setState(() {
       if (_knownSlugs.contains(key)) {
         _knownSlugs.remove(key);
-      } else if (_knownSlugs.length < 60) {
+      } else if (_knownSlugs.length < maxKnownMachineSlugs) {
         _knownSlugs.add(key);
       }
     });
@@ -227,7 +233,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
         _knownSlugs.removeAll(visible);
       } else {
         for (final slug in visible) {
-          if (_knownSlugs.length >= 60) break;
+          if (_knownSlugs.length >= maxKnownMachineSlugs) break;
           _knownSlugs.add(slug);
         }
       }
@@ -341,7 +347,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Choose days and minutes, then create a program. Extra options are optional.',
+                    'Choose days, minutes, and experience, then create a program. Extra options are optional.',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
@@ -370,6 +376,34 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                           onChanged: (_) => _persistPrefs(),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Experience',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Working loads use your body weight and this level.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final item in gymPlanLevels)
+                        ChoiceChip(
+                          label: Text(humanizeLabel(item)),
+                          selected: _level == item,
+                          onSelected: (_) {
+                            setState(() => _level = item);
+                            _persistPrefs();
+                          },
+                        ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -573,7 +607,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             else if (_plans.isEmpty)
               EmptyState(
                 title: 'No program yet',
-                message: 'Choose how often you train above, then create a program.',
+                message: 'Choose how often you train and your experience above, then create a program.',
                 action: ElevatedButton(
                   onPressed: _generating ? null : _createAi,
                   child: const Text('Create my program'),

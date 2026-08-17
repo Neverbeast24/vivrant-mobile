@@ -46,4 +46,13 @@ void main() {
       expect(pickTodaysPlanDay(days, DateTime(2026, 8, 18, 12))?['focus'], 'Push');
     });
   });
+
+  group('sanitizeGymPlanLevel', () {
+    test('defaults unknown values to beginner', () {
+      expect(sanitizeGymPlanLevel(null), 'beginner');
+      expect(sanitizeGymPlanLevel('expert'), 'beginner');
+      expect(sanitizeGymPlanLevel('ADVANCED'), 'advanced');
+      expect(sanitizeGymPlanLevel('intermediate'), 'intermediate');
+    });
+  });
 }
