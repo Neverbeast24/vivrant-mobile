@@ -28,7 +28,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Future<void> _submit() async {
     setState(() => _loading = true);
     try {
-      await ref.read(vivrantApiProvider).forgotPassword(_email.text.trim());
+      await ref.read(vivrantApiProvider).forgotPassword(_email.text.trim().toLowerCase());
       if (!mounted) return;
       context.showSuccess(
         'Check your inbox. Open the link in a browser to set a new password.',

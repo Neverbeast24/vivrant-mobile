@@ -1,5 +1,7 @@
 part of '../vivrant_api.dart';
 
+String _normalizeEmail(String email) => email.trim().toLowerCase();
+
 extension VivrantAuthApi on VivrantApi {
   Future<Map<String, dynamic>> login({
     required String email,
@@ -7,7 +9,7 @@ extension VivrantAuthApi on VivrantApi {
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/auth/login',
-      data: {'email': email, 'password': password},
+      data: {'email': _normalizeEmail(email), 'password': password},
     );
     final data = Map<String, dynamic>.from(res.data ?? {});
     final access = data['access_token'] as String? ??
@@ -32,7 +34,7 @@ extension VivrantAuthApi on VivrantApi {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/auth/signup',
       data: {
-        'email': email,
+        'email': _normalizeEmail(email),
         'password': password,
         if (displayName != null) 'displayName': displayName,
       },
@@ -41,7 +43,7 @@ extension VivrantAuthApi on VivrantApi {
   }
 
   Future<void> forgotPassword(String email) async {
-    await _client.post('/api/auth/forgot-password', data: {'email': email});
+    await _client.post('/api/auth/forgot-password', data: {'email': _normalizeEmail(email)});
   }
 
   Future<void> resetPassword(String password) async {

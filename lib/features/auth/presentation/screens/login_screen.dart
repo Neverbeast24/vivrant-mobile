@@ -64,7 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _formError = null;
     });
     final ok = await ref.read(authProvider.notifier).login(
-          _email.text.trim(),
+          _email.text.trim().toLowerCase(),
           _password.text,
         );
     if (!mounted) return;

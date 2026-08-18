@@ -36,7 +36,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _loading = true);
     final ok = await ref.read(authProvider.notifier).signup(
-          email: _email.text.trim(),
+          email: _email.text.trim().toLowerCase(),
           password: _password.text,
           displayName:
               _name.text.trim().isEmpty ? null : _name.text.trim(),
