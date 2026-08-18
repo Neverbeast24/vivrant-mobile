@@ -103,7 +103,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
-    return pickTodaysPlanDay(days);
+    return pickTodaysPlanDay(days, null, planTrainingDaysList(plan));
   }
 
   List<_RunnerItem> get _items {
@@ -332,7 +332,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
     if (plan == null || today == null) {
       return const VivrantPanel(
         title: "Today's program",
-        child: Text('This program does not have a session for today.'),
+        child: Text('Rest day — no session on your schedule today.'),
       );
     }
 

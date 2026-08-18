@@ -24,6 +24,7 @@ class GymPlansScreen extends ConsumerStatefulWidget {
 
 class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   static const _prefsDaysKey = 'vivrant.gym.plan.days';
+  static const _prefsTrainingDaysKey = 'vivrant.gym.plan.trainingDays';
   static const _prefsSessionKey = 'vivrant.gym.plan.session';
   static const _prefsLevelKey = 'vivrant.gym.plan.level';
   static const _prefsKnownKey = 'vivrant.gym.knownMachines';
@@ -33,7 +34,6 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   final _query = TextEditingController();
   final _knownQuery = TextEditingController();
   final _customCtrl = TextEditingController();
-  final _daysCtrl = TextEditingController(text: '3');
   final _sessionCtrl = TextEditingController(text: '45');
 
   List<Map<String, dynamic>> _plans = [];
@@ -42,6 +42,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   final List<String> _customExercises = [];
   final Set<String> _avoidTargets = {};
   final Set<int> _expanded = {};
+  List<int> _trainingDays = defaultTrainingDaysFromCount(3);
   String _level = 'beginner';
 
   bool _loading = true;
@@ -70,7 +71,6 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     _query.dispose();
     _knownQuery.dispose();
     _customCtrl.dispose();
-    _daysCtrl.dispose();
     _sessionCtrl.dispose();
     super.dispose();
   }
@@ -79,10 +79,15 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     final days = int.tryParse(prefs.getString(_prefsDaysKey) ?? '') ?? 3;
+    final savedDays = prefs.getStringList(_prefsTrainingDaysKey);
+    final trainingDays = sanitizeTrainingDays(
+      (savedDays ?? const <String>[]).map((item) => int.tryParse(item) ?? 0),
+      fallbackCount: days.clamp(2, 6).toInt(),
+    );
     final session = int.tryParse(prefs.getString(_prefsSessionKey) ?? '') ?? 45;
     final level = sanitizeGymPlanLevel(prefs.getString(_prefsLevelKey));
     setState(() {
-      _daysCtrl.text = days.clamp(2, 6).toString();
+      _trainingDays = trainingDays;
       _sessionCtrl.text = session.clamp(15, 120).toString();
       _level = level;
       _knownSlugs
@@ -119,6 +124,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       });
     }
     await prefs.setString(_prefsDaysKey, _daysPerWeek.toString());
+    await prefs.setStringList(
+      _prefsTrainingDaysKey,
+      _trainingDays.map((day) => day.toString()).toList(),
+    );
     await prefs.setString(_prefsSessionKey, _sessionMinutes.toString());
     await prefs.setString(_prefsLevelKey, _level);
     await prefs.setStringList(_prefsKnownKey, known);
@@ -154,10 +163,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     }
   }
 
-  int get _daysPerWeek {
-    final n = int.tryParse(_daysCtrl.text.trim()) ?? 3;
-    return n.clamp(2, 6);
-  }
+  int get _daysPerWeek => _trainingDays.length;
 
   int get _sessionMinutes {
     final n = int.tryParse(_sessionCtrl.text.trim()) ?? 45;
@@ -170,6 +176,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       await _persistPrefs();
       await ref.read(vivrantApiProvider).createAiGymPlan(
             daysPerWeek: _daysPerWeek,
+            trainingDays: _trainingDays,
             sessionMinutes: _sessionMinutes,
             level: _level,
             knownMachineSlugs: _knownSlugs.toList(),
@@ -191,6 +198,20 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     } finally {
       if (mounted) setState(() => _generating = false);
     }
+  }
+
+  void _toggleTrainingDay(int iso) {
+    final selected = _trainingDays.contains(iso);
+    if (selected) {
+      if (_trainingDays.length <= 2) return;
+      setState(() => _trainingDays = _trainingDays.where((day) => day != iso).toList());
+    } else {
+      if (_trainingDays.length >= 6) return;
+      setState(() {
+        _trainingDays = [..._trainingDays, iso]..sort();
+      });
+    }
+    _persistPrefs();
   }
 
   void _addCustom() {
@@ -338,7 +359,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               highlight: 'program',
             ),
             Text(
-              'Create a simple weekly program that fits your schedule.',
+              'Pick the weekdays you train. Workouts and reminders follow this calendar — rest days stay rest days.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
@@ -354,35 +375,59 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Choose days, minutes, and experience, then create a program. Extra options are optional.',
+                    'Pick weekdays, minutes, and experience, then create a program. Extra options are optional.',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  Text(
+                    'Training days',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$_daysPerWeek days/week${formatRestDaysLabel(_trainingDays).isEmpty ? '' : ' · ${formatRestDaysLabel(_trainingDays)}'}. Pick 2–6.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _daysCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Days per week',
-                            helperText: '2–6',
-                          ),
-                          onChanged: (_) => _persistPrefs(),
+                      for (final item in gymWeekdays)
+                        FilterChip(
+                          label: Text(item.short),
+                          selected: _trainingDays.contains(item.iso),
+                          onSelected: (_) => _toggleTrainingDay(item.iso),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: _sessionCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Minutes per workout',
-                            helperText: '15–120',
-                          ),
-                          onChanged: (_) => _persistPrefs(),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Minutes per workout',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final mins in [
+                        ...sessionMinutePresets,
+                        if (!sessionMinutePresets.contains(_sessionMinutes)) _sessionMinutes,
+                      ])
+                        ChoiceChip(
+                          label: Text('$mins min'),
+                          selected: _sessionMinutes == mins,
+                          onSelected: (_) {
+                            _sessionCtrl.text = mins.toString();
+                            _persistPrefs();
+                            setState(() {});
+                          },
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -478,7 +523,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Optional: mark exercises you know so your program can prefer them.',
+                      'Optional: mark exercises you know. If you pick any, your program uses only those (plus anything you type) and will not add extras like a leg press.',
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
@@ -656,7 +701,11 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               else
                 ...filtered.map((p) => _PlanCard(
                       plan: p,
-                      exercises: _exercises,
+                      exercises: _knownSlugs.isEmpty && _customExercises.isEmpty
+                          ? _exercises
+                          : _exercises
+                              .where((e) => _knownSlugs.contains(e.slug))
+                              .toList(growable: false),
                       expanded: _expanded.contains((p['id'] as num?)?.toInt()),
                       onToggleExpand: () {
                         final id = (p['id'] as num?)?.toInt();
@@ -862,7 +911,12 @@ class _PlanCard extends StatelessWidget {
           .toList(),
       exercises,
     );
-    final today = pickTodaysPlanDay(days);
+    final scheduleDays = (plan['training_days'] as List?)
+            ?.map((item) => (item as num).toInt())
+            .toList() ??
+        resolveTrainingDays(days: days, daysPerWeek: (daysPerWeek as num?)?.toInt());
+    final schedule = formatTrainingDaysLabel(scheduleDays);
+    final today = pickTodaysPlanDay(days, null, scheduleDays);
     final todayFirst = (today?['exercises'] as List?)
         ?.whereType<Map>()
         .map((e) => e['name']?.toString() ?? '')
@@ -886,25 +940,28 @@ class _PlanCard extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                       Text(
-                        '${humanizeLabel(plan['focus']?.toString() ?? 'program')} · ${plan['level'] ?? '—'} · ${daysPerWeek ?? '—'} days/wk',
+                        '${humanizeLabel(plan['focus']?.toString() ?? 'program')} · ${plan['level'] ?? '—'} · ${schedule.isNotEmpty ? schedule : '${daysPerWeek ?? '—'} days/wk'}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      if (today != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            [
-                              'Today',
-                              today['day']?.toString() ?? '',
-                              humanizeLabel(today['focus']?.toString() ?? ''),
-                              if (todayFirst != null) todayFirst,
-                            ].where((part) => part.isNotEmpty).join(' · '),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                          ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          today == null
+                              ? 'Rest day · recovery'
+                              : [
+                                  'Today',
+                                  today['day']?.toString() ?? '',
+                                  humanizeLabel(today['focus']?.toString() ?? ''),
+                                  if (todayFirst != null) todayFirst,
+                                ].where((part) => part.isNotEmpty).join(' · '),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: today == null
+                                    ? null
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
                         ),
+                      ),
                     ],
                   ),
                 ),

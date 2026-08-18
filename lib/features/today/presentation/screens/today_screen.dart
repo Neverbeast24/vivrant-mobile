@@ -12,6 +12,7 @@ import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/module_cache.dart';
+import '../../../gym/presentation/gym_labels.dart';
 import '../widgets/quick_actions_row.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
@@ -296,7 +297,7 @@ class _TodayProgramCard extends StatelessWidget {
         children: [
           if (plan == null)
             Text(
-              'No program yet. Create a weekly plan and it will show up here every day.',
+              'No program yet. Create a weekly plan and it will show up here on your training days.',
               style: Theme.of(context).textTheme.bodyMedium,
             )
           else ...[
@@ -311,7 +312,13 @@ class _TodayProgramCard extends StatelessWidget {
               [
                 if ((plan['focus']?.toString() ?? '').isNotEmpty)
                   humanizeLabel(plan['focus'].toString()),
-                if (plan['daysPerWeek'] != null) '${plan['daysPerWeek']} days/week',
+                if ((plan['trainingDays'] as List?)?.isNotEmpty == true)
+                  formatTrainingDaysLabel([
+                    for (final item in plan['trainingDays'] as List)
+                      if (item is num) item.round(),
+                  ])
+                else if (plan['daysPerWeek'] != null)
+                  '${plan['daysPerWeek']} days/week',
                 if ((plan['planCount'] as num?)?.toInt() != null &&
                     (plan['planCount'] as num).toInt() > 1)
                   '${plan['planCount']} saved',
@@ -342,6 +349,16 @@ class _TodayProgramCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
+            ] else ...[
+              const SizedBox(height: 12),
+              Text(
+                [
+                  'Rest day — nothing programmed today',
+                  if ((plan['nextSession']?.toString() ?? '').isNotEmpty)
+                    'next session ${plan['nextSession']}',
+                ].join(' · '),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ],
         ],

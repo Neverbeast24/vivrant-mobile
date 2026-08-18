@@ -26,7 +26,7 @@ class TodaysProgramMoves extends StatelessWidget {
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
-    final today = pickTodaysPlanDay(days);
+    final today = pickTodaysPlanDay(days, null, planTrainingDaysList(plan));
     final programmed = (today?['exercises'] as List? ?? const [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
@@ -59,12 +59,8 @@ class TodaysProgramMoves extends StatelessWidget {
         onPressed: () => context.push('/gym/sessions'),
         child: const Text('Start'),
       ),
-      child: today == null
-          ? TextButton(
-              onPressed: () => context.push('/gym/plans'),
-              child: const Text('Create a program so today’s moves show here'),
-            )
-          : Wrap(
+      child: today != null
+          ? Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
@@ -84,6 +80,14 @@ class TodaysProgramMoves extends StatelessWidget {
                 if (programmed.isEmpty)
                   const Text('Rest day — browse the library below.'),
               ],
+            )
+          : TextButton(
+              onPressed: () => context.push(plan == null ? '/gym/plans' : '/gym/sessions'),
+              child: Text(
+                plan == null
+                    ? 'Create a program so today’s moves show here'
+                    : 'Rest day — nothing programmed today',
+              ),
             ),
     );
   }

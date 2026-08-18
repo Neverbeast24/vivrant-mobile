@@ -53,6 +53,17 @@ ShareExportDoc gymPlanDoc(Map<String, dynamic> plan) {
   final level = plan['level']?.toString() ?? '';
   final daysPerWeek = plan['days_per_week'] ??
       ((plan['days'] is List) ? (plan['days'] as List).length : '');
+  const weekdayShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final trainingDays = (plan['training_days'] as List? ?? const [])
+      .whereType<num>()
+      .map((n) => n.round())
+      .where((n) => n >= 1 && n <= 7)
+      .toSet()
+      .toList()
+    ..sort();
+  final schedule = trainingDays.isEmpty
+      ? '$daysPerWeek days/week'
+      : trainingDays.map((n) => weekdayShort[n - 1]).join(', ');
   final summary = plan['summary']?.toString();
   final recs = (plan['recommendations'] as List? ?? const [])
       .map((e) => e.toString().trim())
@@ -72,7 +83,7 @@ ShareExportDoc gymPlanDoc(Map<String, dynamic> plan) {
 
   final lines = <String>[
     title,
-    '$focus · $level · $daysPerWeek days/week',
+    '$focus · $level · $schedule',
     if (summary != null && summary.isNotEmpty) '',
     if (summary != null && summary.isNotEmpty) summary,
     if (recs.isNotEmpty) '',

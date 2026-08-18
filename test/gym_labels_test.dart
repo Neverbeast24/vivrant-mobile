@@ -12,13 +12,30 @@ void main() {
         pickTodaysPlanDay(named, DateTime(2026, 8, 17, 12))?['focus'],
         'Pull',
       );
+      expect(pickTodaysPlanDay(named, DateTime(2026, 8, 18, 12)), isNull);
       expect(
         pickTodaysPlanDay(named, DateTime(2026, 8, 19, 12))?['focus'],
         'Push',
       );
     });
 
-    test('rotates unnamed days from Monday', () {
+    test('returns null on rest days when sessions are weekday-labeled', () {
+      final named = [
+        {'day': 'Monday · Pull', 'focus': 'Pull', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Tuesday · Push', 'focus': 'Push', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Wednesday · Legs', 'focus': 'Legs', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Thursday · Upper', 'focus': 'Upper', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Friday · Lower', 'focus': 'Lower', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Sunday · Full body', 'focus': 'Full body', 'exercises': <Map<String, dynamic>>[]},
+      ];
+      expect(pickTodaysPlanDay(named, DateTime(2026, 8, 22, 12)), isNull);
+      expect(
+        pickTodaysPlanDay(named, DateTime(2026, 8, 23, 12))?['focus'],
+        'Full body',
+      );
+    });
+
+    test('uses Mon/Wed/Fri for unlabeled 3-day plans and rests otherwise', () {
       final days = [
         {
           'day': 'Day 1',
@@ -43,7 +60,21 @@ void main() {
         },
       ];
       expect(pickTodaysPlanDay(days, DateTime(2026, 8, 17, 12))?['focus'], 'Pull');
-      expect(pickTodaysPlanDay(days, DateTime(2026, 8, 18, 12))?['focus'], 'Push');
+      expect(pickTodaysPlanDay(days, DateTime(2026, 8, 18, 12)), isNull);
+      expect(pickTodaysPlanDay(days, DateTime(2026, 8, 19, 12))?['focus'], 'Push');
+    });
+
+    test('maps a 6-day unlabeled plan onto Mon–Fri + Sunday', () {
+      final six = [
+        {'day': 'Day 1', 'focus': 'Pull', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Day 2', 'focus': 'Push', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Day 3', 'focus': 'Legs', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Day 4', 'focus': 'Upper', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Day 5', 'focus': 'Lower', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Day 6', 'focus': 'Full', 'exercises': <Map<String, dynamic>>[]},
+      ];
+      expect(pickTodaysPlanDay(six, DateTime(2026, 8, 22, 12)), isNull);
+      expect(pickTodaysPlanDay(six, DateTime(2026, 8, 23, 12))?['focus'], 'Full');
     });
   });
 

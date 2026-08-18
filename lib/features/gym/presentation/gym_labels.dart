@@ -414,34 +414,168 @@ IconData muscleIcon(String muscleGroup) {
   }
 }
 
-const _weekdayFull = [
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
+/// ISO weekdays: 1=Mon … 7=Sun. Mirrors viva-server `GYM_WEEKDAYS`.
+const gymWeekdays = <({int iso, String short, String full})>[
+  (iso: 1, short: 'Mon', full: 'Monday'),
+  (iso: 2, short: 'Tue', full: 'Tuesday'),
+  (iso: 3, short: 'Wed', full: 'Wednesday'),
+  (iso: 4, short: 'Thu', full: 'Thursday'),
+  (iso: 5, short: 'Fri', full: 'Friday'),
+  (iso: 6, short: 'Sat', full: 'Saturday'),
+  (iso: 7, short: 'Sun', full: 'Sunday'),
 ];
-const _weekdayShort = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-/// Pick the session that should show on Today — weekday name first, else Mon-based rotation.
+const sessionMinutePresets = <int>[30, 45, 60, 75, 90];
+
+List<int> defaultTrainingDaysFromCount(int daysPerWeek) {
+  final n = daysPerWeek.clamp(2, 6).toInt();
+  if (n >= 6) return const [1, 2, 3, 4, 5, 7];
+  if (n == 5) return const [1, 2, 3, 4, 5];
+  if (n == 4) return const [1, 2, 4, 5];
+  if (n == 3) return const [1, 3, 5];
+  return const [2, 5];
+}
+
+List<int> sanitizeTrainingDays(Iterable<int> input, {int fallbackCount = 3}) {
+  final seen = <int>{};
+  final out = <int>[];
+  for (final raw in input) {
+    if (raw < 1 || raw > 7 || seen.contains(raw)) continue;
+    seen.add(raw);
+    out.add(raw);
+    if (out.length >= 6) break;
+  }
+  out.sort();
+  return out.length >= 2 ? out : defaultTrainingDaysFromCount(fallbackCount);
+}
+
+String formatRestDaysLabel(List<int> trainingDays) {
+  final selected = trainingDays.toSet();
+  final rest = gymWeekdays
+      .where((item) => !selected.contains(item.iso))
+      .map((item) => item.short)
+      .toList();
+  if (rest.isEmpty) return '';
+  if (rest.length == 1) return 'Rest ${rest.first}';
+  if (rest.length == 2) return 'Rest ${rest[0]} & ${rest[1]}';
+  return 'Rest ${rest.sublist(0, rest.length - 1).join(', ')} & ${rest.last}';
+}
+
+String formatTrainingDaysLabel(List<int> days) {
+  final sorted = sanitizeTrainingDays(days, fallbackCount: days.length);
+  if (sorted.isEmpty) return '';
+  if (sorted.length == 7) return 'Every day';
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final parts = <String>[];
+  var start = sorted.first;
+  var prev = sorted.first;
+  void flush() {
+    if (start == prev) {
+      parts.add(names[start - 1]);
+    } else if (prev - start == 1) {
+      parts.add('${names[start - 1]}, ${names[prev - 1]}');
+    } else {
+      parts.add('${names[start - 1]}–${names[prev - 1]}');
+    }
+  }
+
+  for (var i = 1; i < sorted.length; i++) {
+    if (sorted[i] == prev + 1) {
+      prev = sorted[i];
+      continue;
+    }
+    flush();
+    start = prev = sorted[i];
+  }
+  flush();
+  return parts.join(', ');
+}
+
+String? nextTrainingDayHint(List<int> trainingDays, [DateTime? date]) {
+  final schedule = sanitizeTrainingDays(trainingDays, fallbackCount: trainingDays.length);
+  if (schedule.isEmpty) return null;
+  final now = date ?? DateTime.now();
+  final todayIso = now.weekday;
+  for (var offset = 1; offset <= 7; offset++) {
+    final iso = ((todayIso - 1 + offset) % 7) + 1;
+    if (!schedule.contains(iso)) continue;
+    final name = gymWeekdays.firstWhere((item) => item.iso == iso).full;
+    if (offset == 1) return 'Tomorrow';
+    return name;
+  }
+  return null;
+}
+
+List<int> resolveTrainingDays({
+  Iterable<int>? trainingDays,
+  List<Map<String, dynamic>> days = const [],
+  int? daysPerWeek,
+}) {
+  if (trainingDays != null) {
+    final out = <int>[];
+    for (final n in trainingDays) {
+      if (n < 1 || n > 7 || out.contains(n)) continue;
+      out.add(n);
+    }
+    out.sort();
+    if (out.length >= 2) return out.take(6).toList();
+  }
+  final labeled = <int>[];
+  for (final day in days) {
+    final iso = weekdayIsoFromLabel(day['day']?.toString() ?? '');
+    if (iso == null || labeled.contains(iso)) continue;
+    labeled.add(iso);
+  }
+  labeled.sort();
+  if (labeled.length >= 2) return labeled.take(6).toList();
+  return defaultTrainingDaysFromCount(daysPerWeek ?? (days.isEmpty ? 3 : days.length));
+}
+
+int? weekdayIsoFromLabel(String label) {
+  final raw = label.toLowerCase();
+  if (raw.isEmpty) return null;
+  final tokens = raw.split(RegExp(r'[\s,/:.-]+')).where((part) => part.isNotEmpty);
+  for (final item in gymWeekdays) {
+    if (raw.contains(item.full.toLowerCase()) || tokens.contains(item.short.toLowerCase())) {
+      return item.iso;
+    }
+  }
+  return null;
+}
+
+/// Pick the session that should show on Today.
+/// Named weekdays and saved training_days are a calendar; rest days return null.
 /// Mirrors viva-server `pickTodaysPlanDay`.
 Map<String, dynamic>? pickTodaysPlanDay(
   List<Map<String, dynamic>> days, [
   DateTime? date,
+  List<int>? trainingDays,
 ]) {
   if (days.isEmpty) return null;
   final now = date ?? DateTime.now();
-  final full = _weekdayFull[now.weekday - 1];
-  final short = _weekdayShort[now.weekday - 1];
-  for (final day in days) {
-    final label = (day['day']?.toString() ?? '').toLowerCase();
-    final tokens = label.split(RegExp(r'[\s,/:.-]+')).where((part) => part.isNotEmpty);
-    if (label.contains(full) || tokens.contains(short)) return day;
+  final iso = now.weekday; // DateTime: 1=Mon … 7=Sun
+  final named = days.map((day) => weekdayIsoFromLabel(day['day']?.toString() ?? '')).toList();
+  if (named.any((value) => value != null)) {
+    final index = named.indexOf(iso);
+    return index >= 0 ? days[index] : null;
   }
-  final mondayIndex = now.weekday == DateTime.sunday ? 6 : now.weekday - 1;
-  return days[mondayIndex % days.length];
+  final schedule = resolveTrainingDays(
+    trainingDays: trainingDays,
+    days: days,
+    daysPerWeek: days.length,
+  );
+  final index = schedule.indexOf(iso);
+  if (index < 0) return null;
+  return index < days.length ? days[index] : null;
+}
+
+List<int>? planTrainingDaysList(Map<String, dynamic>? plan) {
+  final raw = plan?['training_days'];
+  if (raw is! List) return null;
+  return [
+    for (final item in raw)
+      if (item is num) item.round() else int.tryParse(item.toString()) ?? 0,
+  ].where((n) => n >= 1 && n <= 7).toList();
 }
 
 int parseRestSeconds(String rest) {
