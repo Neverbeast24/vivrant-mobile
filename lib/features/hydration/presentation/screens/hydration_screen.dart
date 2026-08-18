@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../wellness/presentation/widgets/wellness_pulse_bar.dart';
 
 class HydrationScreen extends ConsumerStatefulWidget {
   const HydrationScreen({super.key});
@@ -18,6 +19,7 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
   int _added = 0;
   bool _busy = false;
   bool _loading = true;
+  Map<String, dynamic> _today = const {};
 
   @override
   void initState() {
@@ -31,6 +33,7 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
       final today = await ref.read(vivrantApiProvider).getToday();
       if (!mounted) return;
       setState(() {
+        _today = today;
         _todayMl = (today['water_ml'] as num?)?.toInt() ?? 0;
         _loading = false;
       });
@@ -82,6 +85,10 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
             title: 'Stay',
             highlight: 'hydrated',
           ),
+          if (_today.isNotEmpty) ...[
+            WellnessPulseBar(today: _today, current: 'hydration'),
+            const SizedBox(height: 16),
+          ],
           if (_loading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),

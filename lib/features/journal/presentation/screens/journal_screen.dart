@@ -9,6 +9,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
+import '../../../wellness/presentation/widgets/wellness_pulse_bar.dart';
 
 class JournalScreen extends ConsumerStatefulWidget {
   const JournalScreen({super.key});
@@ -20,6 +21,7 @@ class JournalScreen extends ConsumerStatefulWidget {
 class _JournalScreenState extends ConsumerState<JournalScreen> {
   final _query = TextEditingController();
   List<JournalEntry> _entries = [];
+  Map<String, dynamic> _today = const {};
   bool _loading = true;
   String? _error;
   final _title = TextEditingController();
@@ -64,8 +66,15 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
       _error = null;
     });
     try {
-      final entries = await ref.read(vivrantApiProvider).listJournal();
+      final api = ref.read(vivrantApiProvider);
+      final results = await Future.wait([
+        api.listJournal(),
+        api.getToday(),
+      ]);
       if (!mounted) return;
+      final entries = results[0] as List<JournalEntry>;
+      final today = results[1] as Map<String, dynamic>;
+      setState(() => _today = today);
       _setEntries(entries);
     } catch (e) {
       if (!mounted) return;
@@ -154,6 +163,10 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
               title: 'Your',
               highlight: 'journal',
             ),
+            if (_today.isNotEmpty) ...[
+              WellnessPulseBar(today: _today),
+              const SizedBox(height: 16),
+            ],
             VivrantPanel(
               title: 'New entry',
               child: Column(

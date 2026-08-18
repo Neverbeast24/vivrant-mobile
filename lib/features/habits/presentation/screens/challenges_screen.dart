@@ -6,6 +6,7 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
 
 class ChallengesScreen extends ConsumerStatefulWidget {
@@ -18,6 +19,7 @@ class ChallengesScreen extends ConsumerStatefulWidget {
 class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
   final _query = TextEditingController();
   List<Map<String, dynamic>> _items = [];
+  List<Habit> _habits = [];
   bool _loading = true;
   bool _syncing = false;
   String? _error;
@@ -59,8 +61,14 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
       _error = null;
     });
     try {
-      final items = await ref.read(vivrantApiProvider).listChallenges();
+      final api = ref.read(vivrantApiProvider);
+      final items = await api.listChallenges();
+      List<Habit> habits = const [];
+      try {
+        habits = await api.listHabits();
+      } catch (_) {}
       if (!mounted) return;
+      _habits = habits;
       _setItems(items);
     } catch (e) {
       if (!mounted) return;
@@ -212,6 +220,47 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
               icon: const Icon(Icons.sync),
               label: Text(_syncing ? 'Syncing…' : 'Sync progress'),
             ),
+            if (_habits.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              VivrantPanel(
+                title: 'Today’s habits',
+                child: Column(
+                  children: [
+                    for (final habit in _habits)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ListRow(
+                          title: habit.title,
+                          leading: Checkbox(
+                            value: habit.doneToday,
+                            onChanged: (v) async {
+                              final done = v ?? false;
+                              try {
+                                await ref
+                                    .read(vivrantApiProvider)
+                                    .toggleHabit(habit.id, done);
+                                if (!mounted) return;
+                                setState(() {
+                                  _habits = [
+                                    for (final h in _habits)
+                                      if (h.id == habit.id)
+                                        h.copyWith(doneToday: done)
+                                      else
+                                        h,
+                                  ];
+                                });
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             if (_loading)
               const Padding(

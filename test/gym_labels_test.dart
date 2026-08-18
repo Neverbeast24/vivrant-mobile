@@ -55,4 +55,32 @@ void main() {
       expect(sanitizeGymPlanLevel('intermediate'), 'intermediate');
     });
   });
+
+  group('parseRestSeconds', () {
+    test('reads seconds, minutes, and zero rest', () {
+      expect(parseRestSeconds('90s'), 90);
+      expect(parseRestSeconds('2 min'), 120);
+      expect(parseRestSeconds('60-90s'), 60);
+      expect(parseRestSeconds('0s'), 0);
+      expect(parseRestSeconds('none'), 0);
+    });
+  });
+
+  group('parseSetCount', () {
+    test('reads the leading set count', () {
+      expect(parseSetCount('4 x 10-12'), 4);
+      expect(parseSetCount('3x10'), 3);
+      expect(parseSetCount('1 set of 35-40 mins'), 1);
+      expect(parseSetCount('12 minutes steady'), 1);
+    });
+  });
+
+  group('gymSessionFocusFromPlan', () {
+    test('maps day labels onto session focus values', () {
+      expect(gymSessionFocusFromPlan('Pull'), 'upper');
+      expect(gymSessionFocusFromPlan('Leg day'), 'lower');
+      expect(gymSessionFocusFromPlan('strength'), 'strength');
+      expect(gymSessionFocusFromPlan('HIIT'), 'endurance');
+    });
+  });
 }

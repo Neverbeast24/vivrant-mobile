@@ -132,6 +132,32 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     }
   }
 
+  Future<void> _syncTodayLeftovers() async {
+    try {
+      final res =
+          await ref.read(vivrantApiProvider).syncRemindersFromTodayLeftovers();
+      if (!mounted) return;
+      final reminder = res['reminder'];
+      if (reminder is Map) {
+        final next = Map<String, dynamic>.from(reminder);
+        final id = (next['id'] as num?)?.toInt();
+        _setItems([
+          next,
+          ..._items.where((r) => (r['id'] as num?)?.toInt() != id),
+        ]);
+      } else {
+        await _load();
+      }
+      if (!mounted) return;
+      context.showSuccess(
+        res['message']?.toString() ?? 'Evening catch-up scheduled',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   Future<void> _syncGymPlan() async {
     try {
       final res = await ref.read(vivrantApiProvider).syncRemindersFromGymPlan();
@@ -197,6 +223,12 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
               onPressed: _syncGymPlan,
               icon: const Icon(Icons.fitness_center),
               label: const Text('Sync gym plan'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _syncTodayLeftovers,
+              icon: const Icon(Icons.wb_twilight_outlined),
+              label: const Text('Nudge leftovers'),
             ),
             const SizedBox(height: 16),
             if (_loading)

@@ -22,6 +22,7 @@ class PantryScreen extends ConsumerStatefulWidget {
 class _PantryScreenState extends ConsumerState<PantryScreen> {
   final _query = TextEditingController();
   List<PantryItem> _items = [];
+  List<GroceryItem> _groceries = [];
   bool _loading = true;
   String? _error;
   String _filter = 'all';
@@ -61,8 +62,14 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
       _error = null;
     });
     try {
-      final items = await ref.read(vivrantApiProvider).listPantry();
+      final api = ref.read(vivrantApiProvider);
+      final items = await api.listPantry();
+      List<GroceryItem> groceries = const [];
+      try {
+        groceries = await api.listGroceries();
+      } catch (_) {}
       if (!mounted) return;
+      _groceries = groceries;
       _setItems(items);
     } catch (e) {
       if (!mounted) return;
@@ -185,16 +192,59 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
               onPressed: () async {
                 try {
                   await ref.read(vivrantApiProvider).addLowStockToGrocery();
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   context.showSuccess('Low stock added to groceries');
+                  await _load();
                 } catch (e) {
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   context.showError(apiErrorMessage(e));
                 }
               },
               icon: const Icon(Icons.shopping_cart_outlined),
               label: const Text('Add low stock to groceries'),
             ),
+            Builder(builder: (context) {
+              final open = _groceries.where((g) => !g.isChecked).toList();
+              if (open.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: VivrantPanel(
+                  title: 'Shopping list',
+                  trailing: TextButton(
+                    onPressed: () => context.push('/groceries'),
+                    child: const Text('Open'),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final item in open.take(8))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ListRow(
+                            title: item.name,
+                            subtitle: item.quantity,
+                            leading: Checkbox(
+                              value: false,
+                              onChanged: (_) async {
+                                try {
+                                  await ref
+                                      .read(vivrantApiProvider)
+                                      .toggleGrocery(item.id, true);
+                                  if (!context.mounted) return;
+                                  context.showSuccess('Checked · pantry restocked');
+                                  await _load();
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  context.showError(apiErrorMessage(e));
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }),
             const SizedBox(height: 16),
             if (_loading)
               const Center(child: CircularProgressIndicator())

@@ -19,6 +19,7 @@ class HabitsScreen extends ConsumerStatefulWidget {
 class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   final _query = TextEditingController();
   List<Habit> _habits = [];
+  List<Map<String, dynamic>> _challenges = [];
   bool _loading = true;
   String? _error;
   String _filter = 'all';
@@ -61,7 +62,12 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     });
     try {
       final habits = await ref.read(vivrantApiProvider).listHabits();
+      List<Map<String, dynamic>> challenges = const [];
+      try {
+        challenges = await ref.read(vivrantApiProvider).listChallenges();
+      } catch (_) {}
       if (!mounted) return;
+      _challenges = challenges;
       _setHabits(habits);
     } catch (e) {
       if (!mounted) return;
@@ -232,6 +238,29 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               caption: 'completed',
               icon: Icons.local_fire_department_outlined,
             ),
+            if (_challenges.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              VivrantPanel(
+                title: 'This week’s challenges',
+                trailing: TextButton(
+                  onPressed: () => context.push('/habits/challenges'),
+                  child: const Text('All'),
+                ),
+                child: Column(
+                  children: [
+                    for (final c in _challenges.take(3))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ListRow(
+                          title: c['title']?.toString() ?? 'Challenge',
+                          subtitle:
+                              '${c['current_value'] ?? 0} / ${c['target_value'] ?? 0}',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _suggestAi,

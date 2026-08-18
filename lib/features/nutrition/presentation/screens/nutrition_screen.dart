@@ -27,6 +27,8 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
 
   final _query = TextEditingController();
   List<NutritionLog> _meals = [];
+  List<PantryItem> _pantry = [];
+  int _waterMl = 0;
   bool _loading = false;
   bool _activated = false;
   String? _error;
@@ -66,11 +68,21 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
       _error = null;
     });
     try {
-      final meals = await ref.read(vivrantApiProvider).listMeals();
+      final api = ref.read(vivrantApiProvider);
+      final results = await Future.wait([
+        api.listMeals(),
+        api.listPantry(),
+        api.getToday(),
+      ]);
       if (!mounted) return;
+      final meals = results[0] as List<NutritionLog>;
+      final pantry = results[1] as List<PantryItem>;
+      final today = results[2] as Map<String, dynamic>;
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.nutrition, meals);
       setState(() {
         _meals = meals;
+        _pantry = pantry.where((p) => p.stockLevel > 0).take(14).toList();
+        _waterMl = (today['water_ml'] as num?)?.toInt() ?? 0;
         _loading = false;
       });
     } catch (e) {
@@ -88,6 +100,8 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
       if (next == _tabIndex) _maybeActivate();
     });
     final totalCal = _meals.fold<double>(0, (s, m) => s + (m.calories ?? 0));
+    const calorieGoal = 2000;
+    final calLeft = (calorieGoal - totalCal).round().clamp(0, calorieGoal);
     final types = _meals
         .map((m) => m.mealType)
         .where((t) => t.isNotEmpty)
@@ -137,9 +151,45 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
             StatCard(
               label: 'Today',
               value: totalCal.toStringAsFixed(0),
-              caption: 'kcal logged',
+              caption: '$calLeft kcal left of $calorieGoal · $_waterMl ml water',
               icon: Icons.restaurant,
             ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final ml in [250, 500])
+                  OutlinedButton(
+                    onPressed: () async {
+                      try {
+                        await ref.read(vivrantApiProvider).addHydration(ml);
+                        if (!context.mounted) return;
+                        context.showSuccess('+$ml ml');
+                        await _load();
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        context.showError(apiErrorMessage(e));
+                      }
+                    },
+                    child: Text('+$ml ml'),
+                  ),
+              ],
+            ),
+            if (_pantry.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const SectionLabel('Cook from pantry'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final item in _pantry)
+                    ActionChip(
+                      label: Text(item.name),
+                      onPressed: () => context.push('/nutrition/log'),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             if (!_activated || _loading)
               const Center(child: CircularProgressIndicator())

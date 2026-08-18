@@ -19,6 +19,7 @@ class GroceriesScreen extends ConsumerStatefulWidget {
 class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
   final _query = TextEditingController();
   List<GroceryItem> _items = [];
+  List<PantryItem> _lowStock = [];
   bool _loading = true;
   String? _error;
   String _filter = 'all';
@@ -60,8 +61,14 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
       _error = null;
     });
     try {
-      final items = await ref.read(vivrantApiProvider).listGroceries();
+      final api = ref.read(vivrantApiProvider);
+      final items = await api.listGroceries();
+      List<PantryItem> low = const [];
+      try {
+        low = (await api.listPantry()).where((p) => p.isLowStock).toList();
+      } catch (_) {}
       if (!mounted) return;
+      _lowStock = low;
       _setItems(items);
     } catch (e) {
       if (!mounted) return;
@@ -374,6 +381,31 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
               caption: 'items',
               icon: Icons.shopping_basket_outlined,
             ),
+            if (_lowStock.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              VivrantPanel(
+                title: 'Low in pantry',
+                trailing: TextButton(
+                  onPressed: () => _run(
+                    () => ref.read(vivrantApiProvider).addLowStockToGrocery(),
+                    'Low stock added to list',
+                  ),
+                  child: const Text('Add all'),
+                ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final item in _lowStock.take(12))
+                      Chip(
+                        label: Text(
+                          '${item.name} · ${item.stockLevel}%',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,

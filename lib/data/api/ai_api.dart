@@ -87,6 +87,14 @@ extension VivrantAiApi on VivrantApi {
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
+  /// Create/refresh an evening reminder from today’s unfinished items.
+  Future<Map<String, dynamic>> syncRemindersFromTodayLeftovers() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/ai/reminders/sync-today',
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
   Future<void> toggleReminder(int id, bool enabled) async {
     await _client.patch(
       '/api/mobile/ai/reminders/$id',

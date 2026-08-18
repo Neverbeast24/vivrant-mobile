@@ -9,6 +9,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/module_cache.dart';
 import '../widgets/gym_nav_card.dart';
+import '../widgets/program_session_panel.dart';
 
 class GymOverviewScreen extends ConsumerStatefulWidget {
   const GymOverviewScreen({super.key});
@@ -20,6 +21,7 @@ class GymOverviewScreen extends ConsumerStatefulWidget {
 class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
     with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _data;
+  List<Map<String, dynamic>> _plans = const [];
   bool _loading = true;
   String? _error;
   late final AnimationController _enter;
@@ -38,6 +40,12 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
       _data = Map<String, dynamic>.from(cached);
       _loading = false;
     }
+    final cachedPlans = ref
+        .read(moduleCacheProvider)
+        .read<List<Map<String, dynamic>>>(ModuleCacheKeys.gymPlans);
+    if (cachedPlans != null) {
+      _plans = List<Map<String, dynamic>>.from(cachedPlans);
+    }
     _load();
   }
 
@@ -54,11 +62,19 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
       _error = null;
     });
     try {
-      final data = await ref.read(vivrantApiProvider).gymOverview();
+      final api = ref.read(vivrantApiProvider);
+      final results = await Future.wait([
+        api.gymOverview(),
+        api.gymPlans(),
+      ]);
       if (!mounted) return;
+      final data = results[0] as Map<String, dynamic>;
+      final plans = results[1] as List<Map<String, dynamic>>;
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymOverview, data);
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymPlans, plans);
       setState(() {
         _data = data;
+        _plans = plans;
         _loading = false;
       });
     } catch (e) {
@@ -186,6 +202,21 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
                       ),
                     ),
                   ),
+                if (_plans.isNotEmpty) ...[
+                  _reveal(
+                    start: 0.16,
+                    finish: 0.58,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: ProgramSessionPanel(
+                        plans: _plans,
+                        onLogged: () {
+                          _load();
+                        },
+                      ),
+                    ),
+                  ),
+                ],
                 // Destinations stay reachable even when overview stats fail.
                 _reveal(
                   start: 0.2,
@@ -225,7 +256,7 @@ class _GymOverviewScreenState extends ConsumerState<GymOverviewScreen>
                         label: 'Sessions',
                         caption: sessions > 0
                             ? '$sessions logged recently'
-                            : 'Log & review workouts',
+                            : 'Today’s program + rest timer',
                         path: '/gym/sessions',
                       ),
                       GymNavCard(

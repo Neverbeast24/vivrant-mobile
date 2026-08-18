@@ -11,6 +11,7 @@ import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
 import '../../../../shared/providers/shell_tab_provider.dart';
+import '../../../gym/presentation/widgets/program_session_panel.dart';
 
 class MovementScreen extends ConsumerStatefulWidget {
   const MovementScreen({super.key});
@@ -24,6 +25,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
 
   final _query = TextEditingController();
   List<WorkoutLog> _items = [];
+  List<Map<String, dynamic>> _plans = const [];
   bool _loading = false;
   bool _activated = false;
   String? _error;
@@ -72,11 +74,18 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       _error = null;
     });
     try {
-      final items = await ref.read(vivrantApiProvider).listWorkouts();
+      final api = ref.read(vivrantApiProvider);
+      final results = await Future.wait([
+        api.listWorkouts(),
+        api.gymPlans(),
+      ]);
       if (!mounted) return;
+      final items = results[0] as List<WorkoutLog>;
+      final plans = results[1] as List<Map<String, dynamic>>;
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.movement, items);
       setState(() {
         _items = items;
+        _plans = plans;
         _loading = false;
       });
     } catch (e) {
@@ -144,6 +153,10 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 ],
               ),
             ),
+            if (_plans.isNotEmpty) ...[
+              ProgramSessionPanel(plans: _plans, onLogged: _load),
+              const SizedBox(height: 12),
+            ],
             StatCard(
               label: 'Today',
               value: '$minutes min',

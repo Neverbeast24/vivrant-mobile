@@ -7,6 +7,7 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/constants/enums.dart';
+import '../../../../shared/models/models.dart';
 
 class LogMealScreen extends ConsumerStatefulWidget {
   const LogMealScreen({super.key});
@@ -23,6 +24,32 @@ class _LogMealScreenState extends ConsumerState<LogMealScreen> {
   final _fat = TextEditingController();
   String _type = 'breakfast';
   bool _loading = false;
+  List<PantryItem> _pantry = const [];
+  List<NutritionLog> _meals = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContext();
+  }
+
+  Future<void> _loadContext() async {
+    try {
+      final api = ref.read(vivrantApiProvider);
+      final results = await Future.wait([
+        api.listPantry(),
+        api.listMeals(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _pantry = (results[0] as List<PantryItem>)
+            .where((p) => p.stockLevel > 0)
+            .take(14)
+            .toList();
+        _meals = results[1] as List<NutritionLog>;
+      });
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -62,6 +89,35 @@ class _LogMealScreenState extends ConsumerState<LogMealScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          if (_meals.isNotEmpty || _pantry.isNotEmpty) ...[
+            StatCard(
+              label: 'Calories today',
+              value:
+                  '${_meals.fold<double>(0, (s, m) => s + (m.calories ?? 0)).round()}',
+              caption:
+                  '${_meals.length} meal${_meals.length == 1 ? '' : 's'} · ${2000 - _meals.fold<double>(0, (s, m) => s + (m.calories ?? 0)).round()} left of 2000',
+              icon: Icons.local_fire_department_outlined,
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_pantry.isNotEmpty) ...[
+            const SectionLabel('Cook from pantry'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final item in _pantry)
+                  ActionChip(
+                    label: Text(item.name),
+                    onPressed: () {
+                      _name.text = item.name;
+                      setState(() {});
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
           TextField(
             controller: _name,
             decoration: const InputDecoration(labelText: 'Meal name'),

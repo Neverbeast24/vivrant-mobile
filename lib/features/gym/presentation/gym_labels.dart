@@ -444,6 +444,82 @@ Map<String, dynamic>? pickTodaysPlanDay(
   return days[mondayIndex % days.length];
 }
 
+int parseRestSeconds(String rest) {
+  final raw = rest
+      .toLowerCase()
+      .replaceAll(RegExp(r'[–—]'), '-')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (raw.isEmpty || raw == '-' || raw == 'none' || raw == 'no rest') return 0;
+  if (RegExp(r'^0+(?:\s*(?:s|sec|secs|seconds|m|min|mins|minutes))?$').hasMatch(raw)) {
+    return 0;
+  }
+  int clamp(num value) => value.round().clamp(0, 600);
+  final match = RegExp(
+    r'^(\d+(?:\.\d+)?)(?:\s*-\s*\d+(?:\.\d+)?)?\s*(m|min|mins|minutes|s|sec|secs|seconds)?\b',
+  ).firstMatch(raw);
+  if (match == null) return 60;
+  final n = double.parse(match.group(1)!);
+  final unit = match.group(2) ?? '';
+  if (unit.startsWith('m')) return clamp(n * 60);
+  return clamp(n);
+}
+
+int parseSetCount(String sets) {
+  final raw = sets
+      .toLowerCase()
+      .replaceAll(RegExp(r'[–—]'), '-')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  final x = RegExp(r'(\d+)\s*[x×]').firstMatch(raw);
+  if (x != null) return int.parse(x.group(1)!).clamp(1, 10);
+  final word = RegExp(r'(\d+)\s*sets?\b').firstMatch(raw);
+  if (word != null) return int.parse(word.group(1)!).clamp(1, 10);
+  return 1;
+}
+
+const gymSessionFocuses = <String>[
+  'full_body',
+  'strength',
+  'fat_loss',
+  'mobility',
+  'endurance',
+  'upper',
+  'lower',
+  'core',
+];
+
+String gymSessionFocusFromPlan(String focus) {
+  final raw = focus
+      .toLowerCase()
+      .replaceAll(RegExp(r'[_-]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  final compact = raw.replaceAll(' ', '_');
+  if (gymSessionFocuses.contains(compact)) return compact;
+  if (RegExp(r'\b(upper|push|pull|chest|back|shoulder|arm)\b').hasMatch(raw)) {
+    return 'upper';
+  }
+  if (RegExp(r'\b(lower|leg|glute|hamstring|calf|squat)\b').hasMatch(raw)) {
+    return 'lower';
+  }
+  if (RegExp(r'\b(core|ab)\b').hasMatch(raw)) return 'core';
+  if (RegExp(r'\b(cardio|endurance|hiit|run|bike)\b').hasMatch(raw)) {
+    return 'endurance';
+  }
+  if (RegExp(r'\b(mobilit|stretch|yoga)\b').hasMatch(raw)) return 'mobility';
+  if (RegExp(r'\b(fat|cut|loss)\b').hasMatch(raw)) return 'fat_loss';
+  if (RegExp(r'\b(strength|hypertrophy|power)\b').hasMatch(raw)) return 'strength';
+  return 'full_body';
+}
+
+String formatRestClock(int totalSeconds) {
+  final s = totalSeconds.clamp(0, 600);
+  final m = s ~/ 60;
+  final r = s % 60;
+  return '$m:${r.toString().padLeft(2, '0')}';
+}
+
 Color difficultyColor(String difficulty) {
   switch (difficulty.toLowerCase()) {
     case 'beginner':

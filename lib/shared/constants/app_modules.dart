@@ -66,7 +66,7 @@ const appModules = <AppModule>[
   AppModule(
     icon: Icons.history_rounded,
     label: 'Sessions',
-    caption: 'Log gym work',
+    caption: 'Today’s program + rest timer',
     path: '/gym/sessions',
     group: ModuleGroup.training,
   ),

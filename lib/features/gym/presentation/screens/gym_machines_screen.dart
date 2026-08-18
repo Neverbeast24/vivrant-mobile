@@ -12,6 +12,7 @@ import '../../../../shared/providers/module_cache.dart';
 import '../gym_labels.dart';
 import '../widgets/exercise_demo_card.dart';
 import '../widgets/exercise_demo_sheet.dart';
+import '../widgets/todays_program_moves.dart';
 
 class GymMachinesScreen extends ConsumerStatefulWidget {
   const GymMachinesScreen({super.key});
@@ -24,6 +25,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
   final _query = TextEditingController();
   /// Fresh field name avoids hot-reload keeping an old `List<Map>` in state.
   List<GymExercise> _exercises = const [];
+  List<Map<String, dynamic>> _plans = const [];
   bool _loading = true;
   String? _error;
   String _muscle = 'all';
@@ -61,7 +63,12 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
       _error = null;
     });
     try {
-      final rows = await ref.read(vivrantApiProvider).gymExercises();
+      final api = ref.read(vivrantApiProvider);
+      final rows = await api.gymExercises();
+      List<Map<String, dynamic>> plans = const [];
+      try {
+        plans = await api.gymPlans();
+      } catch (_) {}
       if (!mounted) return;
       final exercises = rows
           .map(GymExercise.fromJson)
@@ -70,6 +77,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymMachines, exercises);
       setState(() {
         _exercises = exercises;
+        _plans = plans;
         _loading = false;
       });
     } catch (e) {
@@ -119,6 +127,13 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
               title: 'Gym',
               highlight: 'machines',
             ),
+            TodaysProgramMoves(
+              plans: _plans,
+              exercises: _exercises,
+              machinesOnly: true,
+              onSelect: (exercise) => showExerciseDemoSheet(context, exercise),
+            ),
+            const SizedBox(height: 12),
             Text(
               'Browse machines and watch short demos. Or get simple suggestions for you.',
               style: Theme.of(context).textTheme.bodyMedium,

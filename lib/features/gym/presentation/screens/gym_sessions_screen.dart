@@ -9,6 +9,7 @@ import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
 import '../gym_labels.dart';
+import '../widgets/program_session_panel.dart';
 
 class GymSessionsScreen extends ConsumerStatefulWidget {
   const GymSessionsScreen({super.key});
@@ -20,6 +21,7 @@ class GymSessionsScreen extends ConsumerStatefulWidget {
 class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
   final _query = TextEditingController();
   List<GymSession> _items = [];
+  List<Map<String, dynamic>> _plans = [];
   bool _loading = true;
   String? _error;
   String _filter = 'all';
@@ -62,11 +64,14 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
       _error = null;
     });
     try {
-      final items = await ref.read(vivrantApiProvider).gymSessions();
+      final api = ref.read(vivrantApiProvider);
+      final items = await api.gymSessions();
+      final plans = await api.gymPlans();
       if (!mounted) return;
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymSessions, items);
       setState(() {
         _items = items;
+        _plans = plans;
         _loading = false;
       });
     } catch (e) {
@@ -230,10 +235,17 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
               highlight: 'workouts',
             ),
             Text(
-              'Save gym sessions so you can see your progress.',
+              'Today’s program is listed first. Check off sets, rest between them, then save.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
+            if (_plans.isNotEmpty || !_loading) ...[
+              ProgramSessionPanel(
+                plans: _plans,
+                onLogged: _load,
+              ),
+              const SizedBox(height: 16),
+            ],
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
@@ -249,8 +261,8 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
               )
             else if (_items.isEmpty)
               EmptyState(
-                title: 'No workouts yet',
-                message: 'Log your first gym session — it only takes a minute.',
+                title: 'No workouts saved yet',
+                message: 'Finish today’s program above, or tap + to log something else.',
                 action: ElevatedButton(
                   onPressed: _log,
                   child: const Text('Log a workout'),

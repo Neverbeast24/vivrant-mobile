@@ -7,6 +7,8 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/constants/enums.dart';
+import '../../../../shared/providers/module_cache.dart';
+import '../../../gym/presentation/widgets/program_session_panel.dart';
 
 class LogWorkoutScreen extends ConsumerStatefulWidget {
   const LogWorkoutScreen({super.key});
@@ -21,6 +23,30 @@ class _LogWorkoutScreenState extends ConsumerState<LogWorkoutScreen> {
   final _calories = TextEditingController();
   String _type = 'walk';
   bool _loading = false;
+  List<Map<String, dynamic>> _plans = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final cached = ref
+        .read(moduleCacheProvider)
+        .read<List<Map<String, dynamic>>>(ModuleCacheKeys.gymPlans);
+    if (cached != null) {
+      _plans = List<Map<String, dynamic>>.from(cached);
+    }
+    _loadPlans();
+  }
+
+  Future<void> _loadPlans() async {
+    try {
+      final plans = await ref.read(vivrantApiProvider).gymPlans();
+      if (!mounted) return;
+      ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymPlans, plans);
+      setState(() => _plans = plans);
+    } catch (_) {
+      // Keep walk/run logging even if programs fail to load.
+    }
+  }
 
   @override
   void dispose() {
@@ -58,6 +84,20 @@ class _LogWorkoutScreenState extends ConsumerState<LogWorkoutScreen> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          ProgramSessionPanel(
+            plans: _plans,
+            onLogged: () {
+              if (mounted) context.pop();
+            },
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Or log a walk, run, or yoga',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _title,
             decoration: const InputDecoration(labelText: 'Title'),

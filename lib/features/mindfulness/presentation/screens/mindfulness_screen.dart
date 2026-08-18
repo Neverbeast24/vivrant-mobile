@@ -7,6 +7,7 @@ import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../wellness/presentation/widgets/wellness_pulse_bar.dart';
 
 class MindfulnessScreen extends ConsumerStatefulWidget {
   const MindfulnessScreen({super.key});
@@ -19,6 +20,28 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
   int _mood = 3;
   final _note = TextEditingController();
   bool _loading = false;
+  Map<String, dynamic> _today = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToday();
+  }
+
+  Future<void> _loadToday() async {
+    try {
+      final today = await ref.read(vivrantApiProvider).getToday();
+      if (!mounted) return;
+      final checkin = today['checkin'] is Map
+          ? Map<String, dynamic>.from(today['checkin'] as Map)
+          : const <String, dynamic>{};
+      setState(() {
+        _today = today;
+        final mood = (checkin['mood'] as num?)?.toInt();
+        if (mood != null) _mood = mood;
+      });
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -66,6 +89,10 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
             title: 'How are you',
             highlight: 'feeling?',
           ),
+          if (_today.isNotEmpty) ...[
+            WellnessPulseBar(today: _today, current: 'mindfulness'),
+            const SizedBox(height: 16),
+          ],
           VivrantPanel(
             title: 'Mood (1–5)',
             child: Column(

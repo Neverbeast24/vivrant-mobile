@@ -9,6 +9,7 @@ import '../../../../shared/providers/module_cache.dart';
 import '../gym_labels.dart';
 import '../widgets/exercise_demo_card.dart';
 import '../widgets/exercise_demo_sheet.dart';
+import '../widgets/todays_program_moves.dart';
 
 class GymDemosScreen extends ConsumerStatefulWidget {
   const GymDemosScreen({super.key});
@@ -21,6 +22,7 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
   final _query = TextEditingController();
   /// Fresh field name avoids hot-reload keeping an old `List<Map>` in state.
   List<GymExercise> _exercises = const [];
+  List<Map<String, dynamic>> _plans = const [];
   bool _loading = true;
   String? _error;
   String _muscle = 'all';
@@ -58,7 +60,12 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
       _error = null;
     });
     try {
-      final rows = await ref.read(vivrantApiProvider).gymExercises();
+      final api = ref.read(vivrantApiProvider);
+      final rows = await api.gymExercises();
+      List<Map<String, dynamic>> plans = const [];
+      try {
+        plans = await api.gymPlans();
+      } catch (_) {}
       if (!mounted) return;
       final exercises = rows
           .map(GymExercise.fromJson)
@@ -67,6 +74,7 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymDemos, exercises);
       setState(() {
         _exercises = exercises;
+        _plans = plans;
         _loading = false;
       });
     } catch (e) {
@@ -136,6 +144,14 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
                         title: 'Exercise',
                         highlight: 'demos',
                       ),
+                      TodaysProgramMoves(
+                        plans: _plans,
+                        exercises: _exercises,
+                        machinesOnly: false,
+                        onSelect: (exercise) =>
+                            showExerciseDemoSheet(context, exercise),
+                      ),
+                      const SizedBox(height: 14),
                       VivrantSearchField(
                         controller: _query,
                         hintText: 'Search exercises…',

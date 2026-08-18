@@ -21,6 +21,7 @@ class GoalsScreen extends ConsumerStatefulWidget {
 class _GoalsScreenState extends ConsumerState<GoalsScreen>
     with SingleTickerProviderStateMixin {
   List<HealthGoal> _goals = [];
+  Map<String, dynamic> _today = const {};
   bool _loading = true;
   String? _error;
   late final AnimationController _enter;
@@ -63,9 +64,14 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
       _error = null;
     });
     try {
-      final goals = await ref.read(vivrantApiProvider).listGoals();
+      final api = ref.read(vivrantApiProvider);
+      final results = await Future.wait([
+        api.listGoals(),
+        api.getToday(),
+      ]);
       if (!mounted) return;
-      _setGoals(goals);
+      _today = results[1] as Map<String, dynamic>;
+      _setGoals(results[0] as List<HealthGoal>);
       _enter.forward(from: 0);
     } catch (e) {
       if (!mounted) return;
@@ -248,6 +254,68 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                 highlight: 'targets',
               ),
             ),
+            if (_today.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Builder(builder: (context) {
+                final checkin = _today['checkin'] is Map
+                    ? Map<String, dynamic>.from(_today['checkin'] as Map)
+                    : const <String, dynamic>{};
+                final waterMl = (_today['water_ml'] as num?)?.toInt() ??
+                    (checkin['water_ml'] as num?)?.toInt() ??
+                    0;
+                final calories = (_today['calories'] as num?)?.toInt() ?? 0;
+                final workouts = (_today['workouts_today'] as num?)?.toInt() ?? 0;
+                final sleepMin = (checkin['sleep_minutes'] as num?)?.toInt();
+                final items = [
+                  ('Water', '${(waterMl / 1000).toStringAsFixed(1)}L'),
+                  ('Calories', '$calories'),
+                  ('Workouts', '$workouts'),
+                  (
+                    'Sleep',
+                    sleepMin == null
+                        ? '—'
+                        : '${(sleepMin / 60).toStringAsFixed(1)}h'
+                  ),
+                ];
+                return Row(
+                  children: [
+                    for (var i = 0; i < items.length; i++) ...[
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: panel,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                items[i].$1.toUpperCase(),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: muted,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                items[i].$2,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: ink,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (i < items.length - 1) const SizedBox(width: 8),
+                    ],
+                  ],
+                );
+              }),
+            ],
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _suggestAi,

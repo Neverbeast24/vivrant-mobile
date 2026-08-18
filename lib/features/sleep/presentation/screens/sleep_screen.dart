@@ -6,6 +6,7 @@ import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../wellness/presentation/widgets/wellness_pulse_bar.dart';
 
 class SleepScreen extends ConsumerStatefulWidget {
   const SleepScreen({super.key});
@@ -19,6 +20,21 @@ class _SleepScreenState extends ConsumerState<SleepScreen> {
   final _note = TextEditingController();
   int _quality = 3;
   bool _loading = false;
+  Map<String, dynamic> _today = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToday();
+  }
+
+  Future<void> _loadToday() async {
+    try {
+      final today = await ref.read(vivrantApiProvider).getToday();
+      if (!mounted) return;
+      setState(() => _today = today);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -69,6 +85,10 @@ class _SleepScreenState extends ConsumerState<SleepScreen> {
             title: 'Sleep',
             highlight: 'log',
           ),
+          if (_today.isNotEmpty) ...[
+            WellnessPulseBar(today: _today, current: 'sleep'),
+            const SizedBox(height: 16),
+          ],
           VivrantPanel(
             title: 'Last night',
             child: Column(

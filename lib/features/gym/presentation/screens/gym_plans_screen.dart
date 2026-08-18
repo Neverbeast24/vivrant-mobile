@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/network/api_client.dart';
@@ -176,7 +177,13 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             avoidTargets: _avoidTargets.toList(),
           );
       if (!mounted) return;
-      context.showSuccess('Your program is ready');
+      showAppSnackBar(
+        context,
+        message: 'Your program is ready',
+        tone: SnackTone.success,
+        actionLabel: 'Start today',
+        onAction: () => context.push('/gym/sessions'),
+      );
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -917,6 +924,17 @@ class _PlanCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (today != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/gym/sessions'),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text("Start today's workout"),
+                ),
+              ),
+            ],
             if (summary != null && summary.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(summary, style: Theme.of(context).textTheme.bodySmall),
