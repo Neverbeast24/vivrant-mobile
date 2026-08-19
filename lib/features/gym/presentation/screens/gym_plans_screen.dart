@@ -302,16 +302,12 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   }
 
   void _addCustom() {
-    final cleaned = sanitizeCustomExercises([_customCtrl.text]);
+    final cleaned = sanitizeCustomExercises([..._customExercises, _customCtrl.text]);
     if (cleaned.isEmpty) return;
-    final name = cleaned.first;
-    final exists = _customExercises.any((e) => e.toLowerCase() == name.toLowerCase());
-    if (exists || _customExercises.length >= 20) {
-      _customCtrl.clear();
-      return;
-    }
     setState(() {
-      _customExercises.add(name);
+      _customExercises
+        ..clear()
+        ..addAll(cleaned);
       _customCtrl.clear();
     });
     _persistPrefs();
@@ -1338,33 +1334,64 @@ class _PlanCard extends StatelessWidget {
                   Builder(
                     builder: (context) {
                       final ex = Map<String, dynamic>.from(raw as Map);
-                      final name = ex['name']?.toString() ?? 'Movement';
+                      final details = gymMoveDetails(ex['name']?.toString() ?? 'Movement');
                       final notes = ex['notes']?.toString() ?? '';
-                      final linked = findExerciseMatch(name, exercises);
+                      final linked = findExerciseMatch(details.displayName, exercises) ??
+                          findRelatedExerciseMatch(details.displayName, exercises);
+                      final cue = notes.isNotEmpty
+                          ? notes
+                          : (linked?.cues?.trim().isNotEmpty == true
+                              ? linked!.cues!
+                              : details.cues);
+                      final sets = [
+                        if ((ex['sets']?.toString() ?? '').isNotEmpty) ex['sets'],
+                        if ((ex['weight']?.toString() ?? '').trim().isNotEmpty) ex['weight'],
+                        if ((ex['rest']?.toString() ?? '').isNotEmpty) 'rest ${ex['rest']}',
+                      ].join(' · ');
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (linked != null) ...[
-                              _KnownExerciseThumb(exercise: linked, size: 32),
-                              const SizedBox(width: 8),
-                            ],
+                            if (linked != null)
+                              _KnownExerciseThumb(exercise: linked, size: 32)
+                            else
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 32,
+                                  height: 32,
+                                  child: ColoredBox(
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                                    child: Icon(
+                                      muscleIcon(details.muscleGroup),
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    formatGymExerciseLine(ex),
+                                    details.displayName,
+                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                  Text(
+                                    '${humanizeLabel(linked?.muscleGroup ?? details.muscleGroup)} · ${humanizeLabel(linked?.equipment ?? details.equipment)}',
                                     style: Theme.of(context).textTheme.bodySmall,
                                   ),
-                                  if (notes.isNotEmpty)
-                                    Text(
-                                      notes,
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            fontSize: 11,
-                                          ),
-                                    ),
+                                  if (sets.isNotEmpty)
+                                    Text(sets, style: Theme.of(context).textTheme.bodySmall),
+                                  Text(
+                                    cue,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontSize: 11,
+                                        ),
+                                  ),
                                 ],
                               ),
                             ),

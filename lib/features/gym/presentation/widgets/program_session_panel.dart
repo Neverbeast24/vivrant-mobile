@@ -140,8 +140,8 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
       for (var i = 0; i < exercises.length; i++)
         _RunnerItem(
           key: 'main-$i',
-          name: exercises[i]['name']?.toString() ?? 'Movement',
-          originalName: exercises[i]['name']?.toString() ?? 'Movement',
+          name: displayGymMoveName(exercises[i]['name']?.toString()),
+          originalName: displayGymMoveName(exercises[i]['name']?.toString()),
           setsLabel: exercises[i]['sets']?.toString() ?? '3 x 10',
           rest: exercises[i]['rest']?.toString() ?? '60s',
           restSeconds: parseRestSeconds(exercises[i]['rest']?.toString() ?? '60s'),
@@ -151,7 +151,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
               ? null
               : exercises[i]['weight'].toString(),
           notes: (exercises[i]['notes']?.toString() ?? '').trim().isEmpty
-              ? null
+              ? gymMoveDetails(displayGymMoveName(exercises[i]['name']?.toString())).cues
               : exercises[i]['notes'].toString(),
           swap: alternatives
               .where(
@@ -169,8 +169,8 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
       for (var i = 0; i < addons.length; i++)
         _RunnerItem(
           key: 'addon-$i',
-          name: addons[i]['name'] ?? 'Extra',
-          originalName: addons[i]['name'] ?? 'Extra',
+          name: displayGymMoveName(addons[i]['name']),
+          originalName: displayGymMoveName(addons[i]['name']),
           setsLabel: addons[i]['sets'] ?? '2 x 12',
           rest: '45s',
           restSeconds: 45,
@@ -628,7 +628,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
           for (final item in items) ...[
             _ExerciseCard(
               item: item,
-              name: _names[item.key] ?? item.name,
+              name: displayGymMoveName(_names[item.key] ?? item.name),
               checks: _checks[item.key] ?? const [],
               onToggleExercise: () => _toggleExercise(item),
               onToggleSet: (index) => _toggleSet(item, index),

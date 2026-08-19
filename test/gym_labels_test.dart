@@ -138,4 +138,19 @@ void main() {
       expect(restRemainingSeconds(ends, now.add(const Duration(seconds: 120))), 0);
     });
   });
+
+  group('custom move formatting', () {
+    test('title-cases typed moves and strips stray commas', () {
+      expect(formatGymMoveName('multi press'), 'Multi Press');
+      expect(formatGymMoveName(', tricep rope,'), 'Tricep Rope');
+      expect(formatGymMoveName('leg curl (extension)'), 'Leg Curl (Extension)');
+    });
+
+    test('splits comma lists when adding custom moves', () {
+      expect(
+        sanitizeCustomExercises([', tricep rope,', 'hip thrust, landmine press']),
+        ['Tricep Rope', 'Hip Thrust', 'Landmine Press'],
+      );
+    });
+  });
 }

@@ -76,7 +76,7 @@ class TodaysProgramMoves extends StatelessWidget {
                         : () => onSelect!(row.exercise),
                   ),
                 for (final ex in unmatched)
-                  Chip(label: Text(ex['name']?.toString() ?? '')),
+                  Chip(label: Text(displayGymMoveName(ex['name']?.toString()))),
                 if (programmed.isEmpty)
                   const Text('Rest day — browse the library below.'),
               ],

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import '../../shared/models/models.dart';
-import 'humanize.dart';
+import '../../features/gym/presentation/gym_labels.dart';
 
 class ShareExportDoc {
   const ShareExportDoc({
@@ -102,7 +102,7 @@ ShareExportDoc gymPlanDoc(Map<String, dynamic> plan) {
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e));
     for (final ex in exercises) {
-      final name = ex['name']?.toString() ?? 'Movement';
+      final name = displayGymMoveName(ex['name']?.toString());
       final sets = ex['sets']?.toString() ?? '';
       final weight = ex['weight']?.toString() ?? '';
       final rest = ex['rest']?.toString() ?? '';
@@ -271,7 +271,7 @@ ShareExportDoc gymSessionsDoc(List<GymSession> sessions) {
       lines.add('Logged ${session.loggedAt!.toIso8601String().substring(0, 10)}');
     }
     for (final ex in session.exercises) {
-      final name = ex['name']?.toString() ?? 'Movement';
+      final name = displayGymMoveName(ex['name']?.toString());
       final sets = ex['sets']?.toString();
       lines.add('  • $name${sets != null && sets.isNotEmpty ? ' · $sets' : ''}');
     }

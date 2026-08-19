@@ -104,16 +104,191 @@ List<String> sanitizeCustomExercises(Iterable<String> input) {
   final seen = <String>{};
   final out = <String>[];
   for (final raw in input) {
-    final name = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (name.length < 2) continue;
-    final clipped = name.length > 80 ? name.substring(0, 80) : name;
-    final key = clipped.toLowerCase();
-    if (seen.contains(key)) continue;
-    seen.add(key);
-    out.add(clipped);
-    if (out.length >= 20) break;
+    final parts = raw.contains(',') ? splitCustomGymMoves(raw) : [formatGymMoveName(raw)];
+    for (final name in parts) {
+      if (name.length < 2) continue;
+      final key = name.toLowerCase();
+      if (seen.contains(key)) continue;
+      seen.add(key);
+      out.add(name);
+      if (out.length >= 20) return out;
+    }
   }
   return out;
+}
+
+String formatGymMoveName(String raw) {
+  var cleaned = raw
+      .replaceAll(RegExp(r'[,;|/]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  cleaned = cleaned.replaceFirst(RegExp(r'^[^A-Za-z0-9(]+'), '');
+  cleaned = cleaned.replaceFirst(RegExp(r'[^A-Za-z0-9)]+$'), '');
+  cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (cleaned.length < 2) return cleaned;
+  if (cleaned.length > 80) cleaned = cleaned.substring(0, 80);
+  return cleaned.replaceAllMapped(RegExp(r"[A-Za-z][A-Za-z0-9']*"), (match) {
+    final word = match.group(0)!;
+    return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+  });
+}
+
+String displayGymMoveName(String? raw) {
+  final formatted = formatGymMoveName(raw ?? '');
+  if (formatted.length >= 2) return formatted;
+  final fallback = (raw ?? '').trim();
+  return fallback.isEmpty ? 'Movement' : fallback;
+}
+
+List<String> splitCustomGymMoves(String raw) {
+  return raw
+      .split(',')
+      .map(formatGymMoveName)
+      .where((name) => name.length >= 2)
+      .toList();
+}
+
+class GymMoveDetails {
+  const GymMoveDetails({
+    required this.displayName,
+    required this.muscleGroup,
+    required this.equipment,
+    required this.cues,
+  });
+
+  final String displayName;
+  final String muscleGroup;
+  final String equipment;
+  final String cues;
+}
+
+String inferCustomMuscleGroup(String name) {
+  final n = name.toLowerCase();
+  if (RegExp(r'\b(sit\s*-?ups?|crunch|plank|ab\b|core|glider)\b').hasMatch(n)) return 'core';
+  if (RegExp(r'\b(treadmill|bike|cardio|run|jog|elliptical)\b').hasMatch(n)) return 'cardio';
+  if (RegExp(r'\b(tricep|bicep|arm|pushdown|rope)\b').hasMatch(n) && !RegExp(r'\bleg\b').hasMatch(n)) {
+    return 'arms';
+  }
+  if (RegExp(r'\b(shoulder|delt|overhead press)\b').hasMatch(n)) return 'shoulders';
+  if (RegExp(r'\b(chest|bench|pec|fly)\b').hasMatch(n)) return 'chest';
+  if (RegExp(r'\bpress\b').hasMatch(n) && !RegExp(r'\b(leg|calf)\b').hasMatch(n)) return 'chest';
+  if (RegExp(r'\b(lat|pulldown|row)\b').hasMatch(n) || RegExp(r'\bback\b').hasMatch(n)) return 'back';
+  if (RegExp(r'\b(glute|hip thrust|kickback)\b').hasMatch(n)) return 'glutes';
+  if (RegExp(r'\b(hamstring|rdl|deadlift|leg curl)\b').hasMatch(n)) return 'hamstrings';
+  if (RegExp(r'\b(calf)\b').hasMatch(n)) return 'calves';
+  if (RegExp(r'\b(inner thigh|adductor|abductor)\b').hasMatch(n)) return 'inner_thighs';
+  if (RegExp(r'\b(leg|squat|lunge|thigh)\b').hasMatch(n)) return 'legs';
+  return 'full_body';
+}
+
+String inferCustomEquipment(String name) {
+  final n = name.toLowerCase();
+  if (RegExp(r'\b(cable|rope|pushdown|pulldown|face pull)\b').hasMatch(n)) return 'cable';
+  if (RegExp(r'\b(dumbbell|barbell|kettlebell|landmine)\b').hasMatch(n)) return 'free_weight';
+  if (RegExp(r'\b(plank|sit\s*-?ups?|crunch|push\s*-?ups?)\b').hasMatch(n)) return 'bodyweight';
+  if (RegExp(r'\b(machine|press|curl|extension|pec|deck|fly)\b').hasMatch(n)) return 'machine';
+  return 'free_weight';
+}
+
+String customGymMoveCue(String name) {
+  final n = name.toLowerCase();
+  if (RegExp(r'\bpress\b').hasMatch(n)) {
+    return 'Brace your core, keep a controlled path, and stop just short of lockout.';
+  }
+  if (RegExp(r'\b(tricep|pushdown|rope|extension)\b').hasMatch(n) && !RegExp(r'\bleg\b').hasMatch(n)) {
+    return 'Keep elbows pinned and finish with a full squeeze.';
+  }
+  if (RegExp(r'\bcurl\b').hasMatch(n)) {
+    return 'Move through a full range and squeeze at the top without swinging.';
+  }
+  if (RegExp(r'\b(row|pulldown)\b').hasMatch(n)) {
+    return 'Pull with your back, keep the chest open, and control the return.';
+  }
+  if (RegExp(r'\b(hip thrust|glute)\b').hasMatch(n)) {
+    return 'Tuck the chin, drive through the heels, and squeeze at the top.';
+  }
+  if (RegExp(r'\b(squat|lunge|leg)\b').hasMatch(n)) {
+    return 'Brace your core, track knees over toes, and push through a full range.';
+  }
+  switch (inferCustomMuscleGroup(name)) {
+    case 'chest':
+      return 'Keep your chest high and control both the press and the return.';
+    case 'back':
+      return 'Lead with the elbows and keep the shoulders packed.';
+    case 'arms':
+      return 'Lock the upper arms in place and squeeze at the end of the rep.';
+    case 'shoulders':
+      return 'Brace your core and lift without shrugging.';
+    case 'core':
+      return 'Keep the ribs down and breathe through a tight midline.';
+    case 'cardio':
+      return 'Stay smooth and keep an easy, repeatable pace.';
+    default:
+      return 'Use a full range of motion and keep the weight under control.';
+  }
+}
+
+GymMoveDetails gymMoveDetails(String name) {
+  final displayName = formatGymMoveName(name);
+  final label = displayName.isEmpty ? 'Movement' : displayName;
+  return GymMoveDetails(
+    displayName: label,
+    muscleGroup: inferCustomMuscleGroup(label),
+    equipment: inferCustomEquipment(label),
+    cues: customGymMoveCue(label),
+  );
+}
+
+String _normalizeGymMoveName(String name) {
+  return name
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .replaceAll(RegExp(r'\b(machines?|trainers?|exercises?|the)\b'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+const _skipMoveTokens = {
+  'the',
+  'a',
+  'an',
+  'and',
+  'or',
+  'of',
+  'to',
+  'with',
+  'machine',
+  'trainer',
+  'exercise',
+  'exercises',
+};
+
+List<String> _significantMoveTokens(String name) {
+  return _normalizeGymMoveName(name)
+      .split(' ')
+      .where((token) => token.length >= 4 && !_skipMoveTokens.contains(token))
+      .toList();
+}
+
+GymExercise? findRelatedExerciseMatch(String name, List<GymExercise> exercises) {
+  final exact = findExerciseMatch(name, exercises);
+  if (exact != null) return exact;
+  final tokens = _significantMoveTokens(name);
+  if (tokens.isEmpty) return null;
+  final muscle = inferCustomMuscleGroup(name);
+  GymExercise? best;
+  var bestScore = 0;
+  for (final item in exercises) {
+    final overlap = _significantMoveTokens(item.name).where(tokens.contains).length;
+    if (overlap == 0) continue;
+    if (item.muscleGroup.isNotEmpty && item.muscleGroup != muscle) continue;
+    final score = overlap + (item.muscleGroup == muscle ? 2 : 0);
+    if (score > bestScore) {
+      best = item;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /// Mirrors web sanitize for avoid targets (allowlist only).
@@ -191,12 +366,12 @@ List<String> programRecommendations(Map<String, dynamic> plan) {
 }
 
 String formatGymExerciseLine(Map<String, dynamic> ex) {
-  final name = ex['name']?.toString() ?? 'Movement';
+  final name = formatGymMoveName(ex['name']?.toString() ?? 'Movement');
   final sets = ex['sets']?.toString() ?? '';
   final rest = ex['rest']?.toString() ?? '';
   final weight = ex['weight']?.toString().trim() ?? '';
   final parts = <String>[
-    name,
+    name.isEmpty ? 'Movement' : name,
     if (sets.isNotEmpty) sets,
     if (weight.isNotEmpty) weight,
     if (rest.isNotEmpty) 'rest $rest',
@@ -300,10 +475,54 @@ List<Map<String, dynamic>> enrichPlanDays(
   List<Map<String, dynamic>> days,
   List<GymExercise> catalog,
 ) {
-  if (days.isEmpty || catalog.isEmpty) return days;
-  return [
-    for (final day in days) _enrichPlanDay(Map<String, dynamic>.from(day), catalog),
+  if (days.isEmpty) return days;
+  final presented = [
+    for (final day in days) _presentPlanDay(Map<String, dynamic>.from(day), catalog),
   ];
+  if (catalog.isEmpty) return presented;
+  return [
+    for (final day in presented) _enrichPlanDay(Map<String, dynamic>.from(day), catalog),
+  ];
+}
+
+Map<String, dynamic> _presentPlanDay(
+  Map<String, dynamic> day,
+  List<GymExercise> catalog,
+) {
+  final exercises = (day['exercises'] as List? ?? const [])
+      .whereType<Map>()
+      .map((raw) {
+        final ex = Map<String, dynamic>.from(raw);
+        final name = formatGymMoveName(ex['name']?.toString() ?? '');
+        if (name.isNotEmpty) ex['name'] = name;
+        final notes = ex['notes']?.toString().trim() ?? '';
+        final match = findExerciseMatch(name, catalog);
+        if (notes.isEmpty && match == null && name.isNotEmpty) {
+          ex['notes'] = gymMoveDetails(name).cues;
+        }
+        return ex;
+      })
+      .toList();
+  final alternatives = [
+    for (final swap in dayAlternatives(day))
+      {
+        'instead_of': formatGymMoveName(swap['instead_of'] ?? ''),
+        'use': formatGymMoveName(swap['use'] ?? ''),
+      },
+  ];
+  final additionals = [
+    for (final addon in dayAdditionals(day))
+      {
+        ...addon,
+        'name': formatGymMoveName(addon['name'] ?? ''),
+      },
+  ];
+  return {
+    ...day,
+    'exercises': exercises,
+    if (alternatives.isNotEmpty) 'alternatives': alternatives,
+    if (additionals.isNotEmpty) 'additionals': additionals,
+  };
 }
 
 Map<String, dynamic> _enrichPlanDay(
