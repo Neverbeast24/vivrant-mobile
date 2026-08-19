@@ -53,6 +53,10 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          if (options.data is FormData) {
+            options.headers.remove(Headers.contentTypeHeader);
+            options.contentType = null;
+          }
           final path = options.path;
           final isAuthEndpoint = path.contains('/api/auth/login') ||
               path.contains('/api/auth/signup') ||
@@ -418,20 +422,28 @@ class ApiClient {
   Future<Response<T>> delete<T>(String path, {Object? data, Options? options}) =>
       _dio.delete<T>(path, data: data, options: options);
 
-  /// Multipart upload — clears the default JSON content-type so Dio can set
-  /// the multipart boundary correctly.
+  /// Multipart upload. Do not set Content-Type — Dio must attach the boundary.
   Future<Response<T>> postMultipart<T>(
     String path,
     FormData data, {
     Options? options,
-  }) =>
-      _dio.post<T>(
-        path,
-        data: data,
-        options: (options ?? Options()).copyWith(
-          contentType: 'multipart/form-data',
-        ),
-      );
+  }) {
+    final headers = Map<String, dynamic>.from(options?.headers ?? const {});
+    headers.remove(Headers.contentTypeHeader);
+    headers.remove('content-type');
+    headers.remove('Content-Type');
+    return _dio.post<T>(
+      path,
+      data: data,
+      options: Options(
+        sendTimeout: options?.sendTimeout ?? const Duration(seconds: 60),
+        receiveTimeout: options?.receiveTimeout ?? const Duration(seconds: 90),
+        extra: options?.extra,
+        headers: headers,
+        responseType: options?.responseType,
+      ),
+    );
+  }
 
   /// Longer receive window for Gemini-backed endpoints.
   static Options get aiOptions => Options(

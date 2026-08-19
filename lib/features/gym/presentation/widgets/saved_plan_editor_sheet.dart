@@ -71,12 +71,26 @@ class _SavedPlanEditorSheetState extends State<SavedPlanEditorSheet> {
               decoration: const InputDecoration(labelText: 'Summary'),
             ),
             const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text(
+              'Long-press a day or move, then drag to reorder.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
             Expanded(
-              child: ListView.builder(
+              child: ReorderableListView.builder(
                 itemCount: _days.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex -= 1;
+                    final day = _days.removeAt(oldIndex);
+                    _days.insert(newIndex, day);
+                  });
+                },
                 itemBuilder: (context, dayIndex) {
                   final day = _days[dayIndex];
                   return Padding(
+                    key: ValueKey(day),
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Card(
                       child: Padding(
@@ -92,40 +106,54 @@ class _SavedPlanEditorSheetState extends State<SavedPlanEditorSheet> {
                               decoration: const InputDecoration(labelText: 'Focus'),
                             ),
                             const SizedBox(height: 8),
-                            for (var i = 0; i < day.exercises.length; i++)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        children: [
-                                          TextField(
-                                            controller: day.exercises[i].name,
-                                            decoration: const InputDecoration(labelText: 'Move'),
+                            ReorderableListView(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              onReorder: (oldIndex, newIndex) {
+                                setState(() {
+                                  if (newIndex > oldIndex) newIndex -= 1;
+                                  final ex = day.exercises.removeAt(oldIndex);
+                                  day.exercises.insert(newIndex, ex);
+                                });
+                              },
+                              children: [
+                                for (var i = 0; i < day.exercises.length; i++)
+                                  Padding(
+                                    key: ValueKey(day.exercises[i]),
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            children: [
+                                              TextField(
+                                                controller: day.exercises[i].name,
+                                                decoration: const InputDecoration(labelText: 'Move'),
+                                              ),
+                                              TextField(
+                                                controller: day.exercises[i].sets,
+                                                decoration: const InputDecoration(labelText: 'Sets'),
+                                              ),
+                                              TextField(
+                                                controller: day.exercises[i].weight,
+                                                decoration: const InputDecoration(labelText: 'Weight'),
+                                              ),
+                                              TextField(
+                                                controller: day.exercises[i].rest,
+                                                decoration: const InputDecoration(labelText: 'Rest'),
+                                              ),
+                                            ],
                                           ),
-                                          TextField(
-                                            controller: day.exercises[i].sets,
-                                            decoration: const InputDecoration(labelText: 'Sets'),
-                                          ),
-                                          TextField(
-                                            controller: day.exercises[i].weight,
-                                            decoration: const InputDecoration(labelText: 'Weight'),
-                                          ),
-                                          TextField(
-                                            controller: day.exercises[i].rest,
-                                            decoration: const InputDecoration(labelText: 'Rest'),
-                                          ),
-                                        ],
-                                      ),
+                                        ),
+                                        IconButton(
+                                          onPressed: () => setState(() => day.exercises.removeAt(i)),
+                                          icon: const Icon(Icons.delete_outline),
+                                        ),
+                                      ],
                                     ),
-                                    IconButton(
-                                      onPressed: () => setState(() => day.exercises.removeAt(i)),
-                                      icon: const Icon(Icons.delete_outline),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                              ],
+                            ),
                             if (day.exercises.length < 6)
                               TextButton.icon(
                                 onPressed: () => setState(() => day.exercises.add(_ExerciseDraft.empty())),

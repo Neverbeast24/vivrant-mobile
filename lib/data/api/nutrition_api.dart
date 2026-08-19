@@ -42,9 +42,15 @@ extension VivrantNutritionApi on VivrantApi {
   }) async {
     if (photoPath != null && photoPath.isNotEmpty) {
       final name = photoPath.split(RegExp(r'[\\/]')).last;
+      final mime = imageMediaType(name);
+      final ext = mime.subtype == 'jpeg' ? 'jpg' : mime.subtype;
       final form = FormData.fromMap({
         'description': description,
-        'photo': await MultipartFile.fromFile(photoPath, filename: name),
+        'photo': await MultipartFile.fromFile(
+          photoPath,
+          filename: 'meal.$ext',
+          contentType: mime,
+        ),
       });
       final res = await _client.postMultipart<Map<String, dynamic>>(
         '/api/mobile/nutrition/estimate',

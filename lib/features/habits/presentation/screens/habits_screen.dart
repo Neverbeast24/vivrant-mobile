@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/list_order.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
@@ -61,14 +64,19 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       _error = null;
     });
     try {
-      final habits = await ref.read(vivrantApiProvider).listHabits();
+      final api = ref.read(vivrantApiProvider);
+      final habits = await api.listHabits();
+      List<int> order = const [];
+      try {
+        order = parseModuleListOrder(await api.getPreferences(), 'habits');
+      } catch (_) {}
       List<Map<String, dynamic>> challenges = const [];
       try {
-        challenges = await ref.read(vivrantApiProvider).listChallenges();
+        challenges = await api.listChallenges();
       } catch (_) {}
       if (!mounted) return;
       _challenges = challenges;
-      _setHabits(habits);
+      _setHabits(applyIdOrder(habits, order, (h) => h.id));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -207,6 +215,19 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     }).toList();
   }
 
+  bool get _canReorder => _filter == 'all' && _query.text.trim().isEmpty;
+
+  void _reorder(int from, int to) {
+    final next = moveItem(_habits, from, to);
+    _setHabits(next);
+    unawaited(
+      ref.read(vivrantApiProvider).saveListOrder(
+        'habits',
+        next.map((h) => h.id).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final done = _habits.where((h) => h.doneToday).length;
@@ -320,11 +341,20 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   message:
                       'No habits match these filters. Try All or another search.',
                 )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+              else ...[
+                if (_canReorder)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Long-press, then drag to reorder.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                NestedReorderableColumn(
+                  enabled: _canReorder,
                   itemCount: filtered.length,
+                  keyOf: (i) => filtered[i].id,
+                  onReorder: _reorder,
                   itemBuilder: (context, index) {
                     final h = filtered[index];
                     return Padding(
@@ -387,6 +417,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     );
                   },
                 ),
+              ],
             ],
           ],
         ),

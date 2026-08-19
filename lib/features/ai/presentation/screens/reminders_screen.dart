@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/list_order.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/module_cache.dart';
@@ -56,9 +59,14 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       _error = null;
     });
     try {
-      final items = await ref.read(vivrantApiProvider).listReminders();
+      final api = ref.read(vivrantApiProvider);
+      final items = await api.listReminders();
+      List<int> order = const [];
+      try {
+        order = parseModuleListOrder(await api.getPreferences(), 'reminders');
+      } catch (_) {}
       if (!mounted) return;
-      _setItems(items);
+      _setItems(applyIdOrder(items, order, (r) => (r['id'] as num).toInt()));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -192,6 +200,19 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     }).toList();
   }
 
+  bool get _canReorder => _filter == 'all' && _query.text.trim().isEmpty;
+
+  void _reorder(int from, int to) {
+    final next = moveItem(_items, from, to);
+    _setItems(next);
+    unawaited(
+      ref.read(vivrantApiProvider).saveListOrder(
+        'reminders',
+        next.map((r) => (r['id'] as num).toInt()).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -286,8 +307,22 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                   message:
                       'No reminders match these filters. Try All or another search.',
                 )
-              else
-                ...filtered.map((r) {
+              else ...[
+                if (_canReorder)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Long-press, then drag to reorder.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                NestedReorderableColumn(
+                  enabled: _canReorder,
+                  itemCount: filtered.length,
+                  keyOf: (i) => (filtered[i]['id'] as num).toInt(),
+                  onReorder: _reorder,
+                  itemBuilder: (context, index) {
+                  final r = filtered[index];
                   final enabled = r['enabled'] as bool? ?? true;
                   final id = (r['id'] as num).toInt();
                   return Padding(
@@ -399,7 +434,9 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                       ),
                     ),
                   );
-                }),
+                  },
+                ),
+              ],
             ],
           ],
         ),

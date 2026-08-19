@@ -923,6 +923,39 @@ List<int> remainingTrainingDays(List<int> trainingDays, Map<String, dynamic>? dr
   return trainingDays.where((iso) => !kept.contains(iso)).toList();
 }
 
+Map<String, dynamic> stampDayWeekday(Map<String, dynamic> day, int iso) {
+  final weekday = gymWeekdays.firstWhere(
+    (item) => item.iso == iso,
+    orElse: () => (iso: iso, short: 'Day', full: 'Day $iso'),
+  );
+  final focus = humanizeLabel(day['focus']?.toString() ?? '');
+  final label = '${weekday.full} · ${focus.isEmpty ? 'Training' : focus}';
+  return {
+    ...day,
+    'day': label.length > 40 ? label.substring(0, 40) : label,
+  };
+}
+
+/// Swap or move a kept workout onto another weekday slot.
+Map<String, dynamic> moveKeptDayOnDraft(
+  Map<String, dynamic> draft,
+  int fromIso,
+  int toIso,
+) {
+  if (fromIso == toIso) return draft;
+  final kept = Map<String, dynamic>.from(keptDaysMap(draft));
+  final fromDay = kept['$fromIso'];
+  if (fromDay is! Map) return draft;
+  final toDay = kept['$toIso'];
+  kept['$toIso'] = stampDayWeekday(Map<String, dynamic>.from(fromDay), toIso);
+  if (toDay is Map) {
+    kept['$fromIso'] = stampDayWeekday(Map<String, dynamic>.from(toDay), fromIso);
+  } else {
+    kept.remove('$fromIso');
+  }
+  return {...draft, 'kept_days': kept};
+}
+
 int restRemainingSeconds(int? restEndsAtMs, [DateTime? now]) {
   if (restEndsAtMs == null || restEndsAtMs <= 0) return 0;
   final left = restEndsAtMs - (now ?? DateTime.now()).millisecondsSinceEpoch;

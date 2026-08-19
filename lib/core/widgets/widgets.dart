@@ -11,6 +11,7 @@ export 'icon_well.dart';
 export 'list_row.dart';
 export 'loading_view.dart';
 export 'module_tile.dart';
+export 'nested_reorderable_column.dart';
 export 'page_header.dart';
 export 'panel.dart';
 export 'primary_button.dart';

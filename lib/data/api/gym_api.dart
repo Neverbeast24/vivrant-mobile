@@ -97,6 +97,14 @@ extension VivrantGymApi on VivrantApi {
     await _client.delete('/api/mobile/gym/plans/draft');
   }
 
+  Future<Map<String, dynamic>> saveGymProgramDraft(Map<String, dynamic> body) async {
+    final res = await _client.put<Map<String, dynamic>>(
+      '/api/mobile/gym/plans/draft',
+      data: body,
+    );
+    return Map<String, dynamic>.from(res.data?['draft'] ?? res.data ?? {});
+  }
+
   Future<Map<String, dynamic>?> gymLiveSession() async {
     final res = await _client.get<Map<String, dynamic>>('/api/mobile/gym/sessions/live');
     final session = res.data?['session'];

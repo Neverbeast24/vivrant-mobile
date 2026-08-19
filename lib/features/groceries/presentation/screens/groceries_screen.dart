@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/list_order.dart';
 import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -63,13 +66,17 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
     try {
       final api = ref.read(vivrantApiProvider);
       final items = await api.listGroceries();
+      List<int> order = const [];
+      try {
+        order = parseModuleListOrder(await api.getPreferences(), 'groceries');
+      } catch (_) {}
       List<PantryItem> low = const [];
       try {
         low = (await api.listPantry()).where((p) => p.isLowStock).toList();
       } catch (_) {}
       if (!mounted) return;
       _lowStock = low;
-      _setItems(items);
+      _setItems(applyIdOrder(items, order, (item) => item.id));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -353,6 +360,19 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
     }).toList();
   }
 
+  bool get _canReorder => _filter == 'all' && _query.text.trim().isEmpty;
+
+  void _reorder(int from, int to) {
+    final next = moveItem(_items, from, to);
+    _setItems(next);
+    unawaited(
+      ref.read(vivrantApiProvider).saveListOrder(
+        'groceries',
+        next.map((item) => item.id).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final checked = _items.where((i) => i.isChecked).length;
@@ -489,91 +509,107 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
                   message:
                       'No items match these filters. Try All or another search.',
                 )
-              else
-                ...filtered.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: VivrantPanel(
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: item.isChecked,
-                            onChanged: (v) => _toggle(item, v ?? false),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.name,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    decoration: item.isChecked
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                ),
-                                if (item.quantity != null)
-                                  Text(
-                                    item.quantity!,
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
-                                  ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            onPressed: () async {
-                              final draft = await showFieldEditorSheet(
-                                context,
-                                title: 'Edit item',
-                                fields: {
-                                  'Name': item.name,
-                                  'Quantity': item.quantity ?? '',
-                                  'Category': item.category,
-                                  'Price': item.estimatedPrice?.toStringAsFixed(0) ?? '',
-                                },
-                              );
-                              if (draft == null || !mounted) return;
-                              try {
-                                const cats = {
-                                  'produce',
-                                  'protein',
-                                  'dairy',
-                                  'grains',
-                                  'pantry',
-                                  'snacks',
-                                  'drinks',
-                                  'household',
-                                  'other',
-                                };
-                                final category = (draft['Category'] ?? item.category).toLowerCase();
-                                final updated = await ref.read(vivrantApiProvider).updateGrocery(item.id, {
-                                  'name': draft['Name'] ?? item.name,
-                                  'quantity': draft['Quantity'],
-                                  'category': cats.contains(category) ? category : item.category,
-                                  if ((draft['Price'] ?? '').isNotEmpty)
-                                    'estimated_price': double.tryParse(draft['Price']!),
-                                });
-                                if (!mounted) return;
-                                _setItems([for (final row in _items) row.id == item.id ? updated : row]);
-                                context.showSuccess('Item updated');
-                              } catch (e) {
-                                if (!mounted) return;
-                                context.showError(apiErrorMessage(e));
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () => _delete(item),
-                          ),
-                        ],
-                      ),
+              else ...[
+                if (_canReorder)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Long-press, then drag to reorder.',
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
+                NestedReorderableColumn(
+                  enabled: _canReorder,
+                  itemCount: filtered.length,
+                  keyOf: (i) => filtered[i].id,
+                  onReorder: _reorder,
+                  itemBuilder: (context, index) {
+                    final item = filtered[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: VivrantPanel(
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: item.isChecked,
+                              onChanged: (v) => _toggle(item, v ?? false),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      decoration: item.isChecked
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                  if (item.quantity != null)
+                                    Text(
+                                      item.quantity!,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () async {
+                                final draft = await showFieldEditorSheet(
+                                  context,
+                                  title: 'Edit item',
+                                  fields: {
+                                    'Name': item.name,
+                                    'Quantity': item.quantity ?? '',
+                                    'Category': item.category,
+                                    'Price': item.estimatedPrice?.toStringAsFixed(0) ?? '',
+                                  },
+                                );
+                                if (draft == null || !mounted) return;
+                                try {
+                                  const cats = {
+                                    'produce',
+                                    'protein',
+                                    'dairy',
+                                    'grains',
+                                    'pantry',
+                                    'snacks',
+                                    'drinks',
+                                    'household',
+                                    'other',
+                                  };
+                                  final category = (draft['Category'] ?? item.category).toLowerCase();
+                                  final updated = await ref.read(vivrantApiProvider).updateGrocery(item.id, {
+                                    'name': draft['Name'] ?? item.name,
+                                    'quantity': draft['Quantity'],
+                                    'category': cats.contains(category) ? category : item.category,
+                                    if ((draft['Price'] ?? '').isNotEmpty)
+                                      'estimated_price': double.tryParse(draft['Price']!),
+                                  });
+                                  if (!mounted) return;
+                                  _setItems([for (final row in _items) row.id == item.id ? updated : row]);
+                                  context.showSuccess('Item updated');
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  context.showError(apiErrorMessage(e));
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _delete(item),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
+              ],
             ],
           ],
         ),

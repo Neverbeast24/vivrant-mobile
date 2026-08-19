@@ -174,4 +174,18 @@ void main() {
       );
     });
   });
+
+  group('moveKeptDayOnDraft', () {
+    test('swaps kept workouts between weekdays', () {
+      final draft = {
+        'kept_days': {
+          '1': {'day': 'Monday · Push', 'focus': 'push', 'exercises': <Map<String, dynamic>>[]},
+          '3': {'day': 'Wednesday · Pull', 'focus': 'pull', 'exercises': <Map<String, dynamic>>[]},
+        },
+      };
+      final next = moveKeptDayOnDraft(draft, 1, 3);
+      expect((next['kept_days'] as Map)['1']['focus'], 'pull');
+      expect((next['kept_days'] as Map)['3']['focus'], 'push');
+    });
+  });
 }

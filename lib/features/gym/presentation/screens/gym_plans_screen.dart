@@ -257,6 +257,61 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     }
   }
 
+  Future<void> _moveKeptDay(int fromIso, int toIso) async {
+    final current = _draft;
+    if (current == null) return;
+    final updated = moveKeptDayOnDraft(current, fromIso, toIso);
+    setState(() => _draft = updated);
+    try {
+      final saved = await ref.read(vivrantApiProvider).saveGymProgramDraft(updated);
+      await _persistDraft(saved.isNotEmpty ? saved : updated);
+    } catch (e) {
+      if (!mounted) return;
+      await _persistDraft(current);
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _customizeDraft() async {
+    final current = _draft;
+    if (current == null) return;
+    final isos = keptIsoList(current);
+    final kept = keptDaysMap(current);
+    final days = [
+      for (final iso in isos)
+        if (kept['$iso'] is Map) Map<String, dynamic>.from(kept['$iso'] as Map),
+    ];
+    if (days.isEmpty) return;
+    final result = await SavedPlanEditorSheet.show(context, {
+      ...current,
+      'title': current['title'] ?? 'Program',
+      'days': days,
+    });
+    if (result == null || !mounted) return;
+    final nextKept = <String, dynamic>{};
+    for (final raw in (result['days'] as List? ?? const [])) {
+      if (raw is! Map) continue;
+      final day = Map<String, dynamic>.from(raw);
+      final iso = weekdayIsoFromLabel(day['day']?.toString() ?? '') ?? (nextKept.length + 1);
+      nextKept['$iso'] = day;
+    }
+    final updated = {
+      ...current,
+      'title': result['title'] ?? current['title'],
+      'summary': result['summary'] ?? current['summary'],
+      'kept_days': nextKept,
+    };
+    try {
+      final saved = await ref.read(vivrantApiProvider).saveGymProgramDraft(updated);
+      await _persistDraft(saved.isNotEmpty ? saved : updated);
+      if (!mounted) return;
+      context.showSuccess('Draft customized');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   Future<void> _saveDraftProgram() async {
     try {
       await ref.read(vivrantApiProvider).commitGymProgramDraft();
@@ -733,9 +788,11 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                 generating: _generating,
                 onKeep: _keepDay,
                 onDrop: _dropDay,
+                onMoveKept: _moveKeptDay,
                 onGenerate: _createAi,
                 onSave: _saveDraftProgram,
                 onDiscard: _discardDraft,
+                onCustomize: _customizeDraft,
                 onShare: () => showShareExportSheet(context, gymProgramDraftDoc(_draft!)),
               ),
             if (_draft != null) const SizedBox(height: 18),
@@ -871,9 +928,11 @@ class _ProgramDraftPanel extends StatelessWidget {
     required this.generating,
     required this.onKeep,
     required this.onDrop,
+    required this.onMoveKept,
     required this.onGenerate,
     required this.onSave,
     required this.onDiscard,
+    required this.onCustomize,
     required this.onShare,
   });
 
@@ -881,9 +940,11 @@ class _ProgramDraftPanel extends StatelessWidget {
   final bool generating;
   final ValueChanged<int> onKeep;
   final ValueChanged<int> onDrop;
+  final void Function(int fromIso, int toIso) onMoveKept;
   final VoidCallback onGenerate;
   final VoidCallback onSave;
   final VoidCallback onDiscard;
+  final VoidCallback onCustomize;
   final VoidCallback onShare;
 
   @override
@@ -916,7 +977,7 @@ class _ProgramDraftPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Keep the days you like. Skip the rest, generate again, and pick the next day — nothing is saved to your program list until you tap Save program.',
+            'Keep the days you like, then long-press a kept day and drop it on another weekday. Customize to drag moves. Nothing is saved to your program list until you tap Save program.',
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 8),
@@ -938,7 +999,7 @@ class _ProgramDraftPanel extends StatelessWidget {
                     final keptDay = kept['$iso'] is Map
                         ? Map<String, dynamic>.from(kept['$iso'] as Map)
                         : null;
-                    return InputChip(
+                    final chip = InputChip(
                       selected: keptDay != null,
                       label: Text(
                         keptDay == null
@@ -948,10 +1009,51 @@ class _ProgramDraftPanel extends StatelessWidget {
                       onDeleted: keptDay == null ? null : () => onDrop(iso),
                       onPressed: keptDay == null ? null : () => onDrop(iso),
                     );
+                    return DragTarget<int>(
+                      onWillAcceptWithDetails: (details) => details.data != iso,
+                      onAcceptWithDetails: (details) => onMoveKept(details.data, iso),
+                      builder: (context, candidate, rejected) {
+                        final highlighted = candidate.isNotEmpty;
+                        final child = AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          padding: highlighted ? const EdgeInsets.all(2) : EdgeInsets.zero,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: highlighted
+                                ? Border.all(color: Theme.of(context).colorScheme.primary)
+                                : null,
+                          ),
+                          child: chip,
+                        );
+                        if (keptDay == null) return child;
+                        return LongPressDraggable<int>(
+                          data: iso,
+                          feedback: Material(
+                            color: Colors.transparent,
+                            child: InputChip(
+                              selected: true,
+                              label: Text(
+                                '${weekday.short} · ${humanizeLabel(keptDay['focus']?.toString() ?? '')}',
+                              ),
+                            ),
+                          ),
+                          childWhenDragging: Opacity(opacity: 0.35, child: child),
+                          child: child,
+                        );
+                      },
+                    );
                   },
                 ),
             ],
           ),
+          if (keptCount > 0) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onCustomize,
+              icon: const Icon(Icons.drag_indicator),
+              label: const Text('Customize kept days'),
+            ),
+          ],
           if (preview.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(

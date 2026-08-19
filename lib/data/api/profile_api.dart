@@ -21,8 +21,14 @@ extension VivrantProfileApi on VivrantApi {
 
   Future<String> uploadAvatar(String filePath, {String? filename}) async {
     final name = filename ?? filePath.split(RegExp(r'[\\/]')).last;
+    final mime = imageMediaType(name);
+    final ext = mime.subtype == 'jpeg' ? 'jpg' : mime.subtype;
     final form = FormData.fromMap({
-      'avatar': await MultipartFile.fromFile(filePath, filename: name),
+      'avatar': await MultipartFile.fromFile(
+        filePath,
+        filename: 'avatar.$ext',
+        contentType: mime,
+      ),
     });
     final res = await _client.postMultipart<Map<String, dynamic>>(
       '/api/mobile/profile/avatar',
@@ -45,6 +51,13 @@ extension VivrantProfileApi on VivrantApi {
     );
     return Map<String, dynamic>.from(
       res.data?['settings'] as Map? ?? res.data ?? {},
+    );
+  }
+
+  Future<void> saveListOrder(String module, List<int> ids) async {
+    await _client.patch(
+      '/api/mobile/settings/preferences',
+      data: {'module': module, 'ids': ids},
     );
   }
 

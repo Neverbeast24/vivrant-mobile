@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/utils/humanize.dart';
+import '../../../../core/utils/list_order.dart';
 import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -64,13 +67,17 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
     try {
       final api = ref.read(vivrantApiProvider);
       final items = await api.listPantry();
+      List<int> order = const [];
+      try {
+        order = parseModuleListOrder(await api.getPreferences(), 'pantry');
+      } catch (_) {}
       List<GroceryItem> groceries = const [];
       try {
         groceries = await api.listGroceries();
       } catch (_) {}
       if (!mounted) return;
       _groceries = groceries;
-      _setItems(items);
+      _setItems(applyIdOrder(items, order, (item) => item.id));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -153,6 +160,19 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
       return item.name.toLowerCase().contains(q) ||
           item.category.toLowerCase().contains(q);
     }).toList();
+  }
+
+  bool get _canReorder => _filter == 'all' && _query.text.trim().isEmpty;
+
+  void _reorder(int from, int to) {
+    final next = moveItem(_items, from, to);
+    _setItems(next);
+    unawaited(
+      ref.read(vivrantApiProvider).saveListOrder(
+        'pantry',
+        next.map((item) => item.id).toList(),
+      ),
+    );
   }
 
   @override
@@ -282,84 +302,100 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                   message:
                       'No items match these filters. Try All or another search.',
                 )
-              else
-                ...filtered.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: VivrantPanel(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              if (item.isLowStock)
-                                Text(
-                                  'LOW',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(
-                                        color: VivrantColors.of(context).accent,
-                                      ),
-                                ),
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined),
-                                onPressed: () async {
-                                  final draft = await showFieldEditorSheet(
-                                    context,
-                                    title: 'Edit pantry item',
-                                    fields: {
-                                      'Name': item.name,
-                                      'Category': item.category,
-                                    },
-                                  );
-                                  if (draft == null || !mounted) return;
-                                  try {
-                                    final updated = await ref.read(vivrantApiProvider).updatePantry(item.id, {
-                                      'name': draft['Name'] ?? item.name,
-                                      'category': draft['Category'] ?? item.category,
-                                    });
-                                    if (!mounted) return;
-                                    _setItems([for (final row in _items) row.id == item.id ? updated : row]);
-                                    context.showSuccess('Item updated');
-                                  } catch (e) {
-                                    if (!mounted) return;
-                                    context.showError(apiErrorMessage(e));
-                                  }
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => _delete(item),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '${item.category} · ${item.stockLevel}%',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          Slider(
-                            value: item.stockLevel.toDouble().clamp(0, 100),
-                            min: 0,
-                            max: 100,
-                            divisions: 20,
-                            label: '${item.stockLevel}%',
-                            onChanged: (v) => _patchStock(item.id, v.round()),
-                            onChangeEnd: (v) => _commitStock(item, v.round()),
-                          ),
-                        ],
-                      ),
+              else ...[
+                if (_canReorder)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Long-press, then drag to reorder.',
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
+                NestedReorderableColumn(
+                  enabled: _canReorder,
+                  itemCount: filtered.length,
+                  keyOf: (i) => filtered[i].id,
+                  onReorder: _reorder,
+                  itemBuilder: (context, index) {
+                    final item = filtered[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: VivrantPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                if (item.isLowStock)
+                                  Text(
+                                    'LOW',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: VivrantColors.of(context).accent,
+                                        ),
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () async {
+                                    final draft = await showFieldEditorSheet(
+                                      context,
+                                      title: 'Edit pantry item',
+                                      fields: {
+                                        'Name': item.name,
+                                        'Category': item.category,
+                                      },
+                                    );
+                                    if (draft == null || !mounted) return;
+                                    try {
+                                      final updated = await ref.read(vivrantApiProvider).updatePantry(item.id, {
+                                        'name': draft['Name'] ?? item.name,
+                                        'category': draft['Category'] ?? item.category,
+                                      });
+                                      if (!mounted) return;
+                                      _setItems([for (final row in _items) row.id == item.id ? updated : row]);
+                                      context.showSuccess('Item updated');
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      context.showError(apiErrorMessage(e));
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _delete(item),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '${item.category} · ${item.stockLevel}%',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            Slider(
+                              value: item.stockLevel.toDouble().clamp(0, 100),
+                              min: 0,
+                              max: 100,
+                              divisions: 20,
+                              label: '${item.stockLevel}%',
+                              onChanged: (v) => _patchStock(item.id, v.round()),
+                              onChangeEnd: (v) => _commitStock(item, v.round()),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
+              ],
             ],
           ],
         ),

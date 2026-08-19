@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
+import '../../../../core/utils/list_order.dart';
 import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
@@ -57,6 +60,17 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
     });
   }
 
+  void _reorder(int from, int to) {
+    final next = moveItem(_goals, from, to);
+    _setGoals(next);
+    unawaited(
+      ref.read(vivrantApiProvider).saveListOrder(
+        'goals',
+        next.map((g) => g.id).toList(),
+      ),
+    );
+  }
+
   Future<void> _load() async {
     final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.goals);
     setState(() {
@@ -69,9 +83,13 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
         api.listGoals(),
         api.getToday(),
       ]);
+      List<int> order = const [];
+      try {
+        order = parseModuleListOrder(await api.getPreferences(), 'goals');
+      } catch (_) {}
       if (!mounted) return;
       _today = results[1] as Map<String, dynamic>;
-      _setGoals(results[0] as List<HealthGoal>);
+      _setGoals(applyIdOrder(results[0] as List<HealthGoal>, order, (g) => g.id));
       _enter.forward(from: 0);
     } catch (e) {
       if (!mounted) return;
@@ -351,8 +369,19 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                   icon: Icons.flag_outlined,
                 ),
               )
-            else
-              ...List.generate(_goals.length, (i) {
+            else ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Long-press, then drag to reorder.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                ),
+              ),
+              NestedReorderableColumn(
+                itemCount: _goals.length,
+                keyOf: (i) => _goals[i].id,
+                onReorder: _reorder,
+                itemBuilder: (context, i) {
                 final g = _goals[i];
                 final start = (0.15 + i * 0.08).clamp(0.0, 0.7);
                 final end = (start + 0.35).clamp(0.0, 1.0);
@@ -559,7 +588,9 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                     ),
                   ),
                 );
-              }),
+                },
+              ),
+            ],
           ],
         ),
       ),

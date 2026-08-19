@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/network/api_client.dart';
+import '../core/network/upload_mime.dart';
 import '../shared/models/models.dart';
 
 part 'api/auth_api.dart';
