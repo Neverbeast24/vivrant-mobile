@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../gym_labels.dart';
+
 class SavedPlanEditorSheet extends StatefulWidget {
   const SavedPlanEditorSheet({super.key, required this.plan});
 
@@ -190,6 +192,11 @@ class _SavedPlanEditorSheetState extends State<SavedPlanEditorSheet> {
                       if (day.additionals.isNotEmpty) 'additionals': day.additionals,
                     },
                 ];
+                final trainingDays = [
+                  for (final day in days)
+                    if (weekdayIsoFromLabel(day['day']?.toString() ?? '') != null)
+                      weekdayIsoFromLabel(day['day']!.toString())!,
+                ];
                 Navigator.pop(context, {
                   'title': _title.text.trim(),
                   'summary': _summary.text.trim(),
@@ -197,7 +204,9 @@ class _SavedPlanEditorSheetState extends State<SavedPlanEditorSheet> {
                   'level': widget.plan['level'],
                   'days': days,
                   'recommendations': widget.plan['recommendations'],
-                  'training_days': widget.plan['training_days'],
+                  'training_days': trainingDays.isNotEmpty
+                      ? trainingDays
+                      : widget.plan['training_days'],
                 });
               },
               child: const Text('Save program'),

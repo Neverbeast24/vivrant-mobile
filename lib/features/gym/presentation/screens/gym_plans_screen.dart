@@ -162,8 +162,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       final plans = await api.gymPlans();
       final exerciseRows = await api.gymExercises();
       Map<String, dynamic>? draft;
+      var remoteDraftOk = false;
       try {
         draft = await api.gymProgramDraft();
+        remoteDraftOk = true;
       } catch (_) {
         draft = _draft;
       }
@@ -171,7 +173,9 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       final exercises = exerciseRows.map(GymExercise.fromJson).toList(growable: false);
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymPlans, plans);
       await PersistentStore.instance.writeJson('vivrant.gym.plans.snap', plans);
-      if (draft != null) await _persistDraft(draft);
+      if (remoteDraftOk) {
+        await _persistDraft(draft);
+      }
       setState(() {
         _plans = plans;
         _exercises = exercises;
@@ -261,6 +265,21 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     final current = _draft;
     if (current == null) return;
     final updated = moveKeptDayOnDraft(current, fromIso, toIso);
+    setState(() => _draft = updated);
+    try {
+      final saved = await ref.read(vivrantApiProvider).saveGymProgramDraft(updated);
+      await _persistDraft(saved.isNotEmpty ? saved : updated);
+    } catch (e) {
+      if (!mounted) return;
+      await _persistDraft(current);
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _reorderPreviewExercises(int dayIndex, int from, int to) async {
+    final current = _draft;
+    if (current == null) return;
+    final updated = reorderPreviewExercisesOnDraft(current, dayIndex, from, to);
     setState(() => _draft = updated);
     try {
       final saved = await ref.read(vivrantApiProvider).saveGymProgramDraft(updated);
@@ -789,6 +808,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                 onKeep: _keepDay,
                 onDrop: _dropDay,
                 onMoveKept: _moveKeptDay,
+                onReorderPreview: _reorderPreviewExercises,
                 onGenerate: _createAi,
                 onSave: _saveDraftProgram,
                 onDiscard: _discardDraft,
@@ -929,6 +949,7 @@ class _ProgramDraftPanel extends StatelessWidget {
     required this.onKeep,
     required this.onDrop,
     required this.onMoveKept,
+    required this.onReorderPreview,
     required this.onGenerate,
     required this.onSave,
     required this.onDiscard,
@@ -941,6 +962,7 @@ class _ProgramDraftPanel extends StatelessWidget {
   final ValueChanged<int> onKeep;
   final ValueChanged<int> onDrop;
   final void Function(int fromIso, int toIso) onMoveKept;
+  final void Function(int dayIndex, int from, int to) onReorderPreview;
   final VoidCallback onGenerate;
   final VoidCallback onSave;
   final VoidCallback onDiscard;
@@ -1060,40 +1082,60 @@ class _ProgramDraftPanel extends StatelessWidget {
               'Latest generated workouts',
               style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
+            Text(
+              'Long-press a move, then drag to reorder.',
+              style: theme.textTheme.bodySmall,
+            ),
             const SizedBox(height: 8),
-            for (final day in preview)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${day['day'] ?? 'Day'} · ${humanizeLabel(day['focus']?.toString() ?? '')}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
+            for (var dayIndex = 0; dayIndex < preview.length; dayIndex++)
+              Builder(
+                builder: (context) {
+                  final day = preview[dayIndex];
+                  final exercises = [
                     for (final raw in (day['exercises'] as List? ?? const []))
-                      Text(
-                        formatGymExerciseLine(Map<String, dynamic>.from(raw as Map)),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () {
-                          final iso = weekdayIsoFromLabel(day['day']?.toString() ?? '');
-                          if (iso != null) onKeep(iso);
-                        },
-                        icon: const Icon(Icons.check_rounded, size: 16),
-                        label: Text(
-                          kept['${weekdayIsoFromLabel(day['day']?.toString() ?? '')}'] != null
-                              ? 'Replace kept day'
-                              : 'Keep this day',
+                      if (raw is Map) Map<String, dynamic>.from(raw),
+                  ];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${day['day'] ?? 'Day'} · ${humanizeLabel(day['focus']?.toString() ?? '')}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        NestedReorderableColumn(
+                          itemCount: exercises.length,
+                          keyOf: (i) => '$dayIndex-$i-${exercises[i]['name']}',
+                          onReorder: (from, to) => onReorderPreview(dayIndex, from, to),
+                          itemBuilder: (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(
+                              formatGymExerciseLine(exercises[index]),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              final iso = weekdayIsoFromLabel(day['day']?.toString() ?? '');
+                              if (iso != null) onKeep(iso);
+                            },
+                            icon: const Icon(Icons.check_rounded, size: 16),
+                            label: Text(
+                              kept['${weekdayIsoFromLabel(day['day']?.toString() ?? '')}'] != null
+                                  ? 'Replace kept day'
+                                  : 'Keep this day',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
           ],
           const SizedBox(height: 8),

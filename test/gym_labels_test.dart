@@ -188,4 +188,26 @@ void main() {
       expect((next['kept_days'] as Map)['3']['focus'], 'push');
     });
   });
+
+  group('reorderPreviewExercisesOnDraft', () {
+    test('moves a preview exercise', () {
+      final draft = {
+        'preview_days': [
+          {
+            'day': 'Monday',
+            'focus': 'push',
+            'exercises': [
+              {'name': 'Press'},
+              {'name': 'Fly'},
+            ],
+          },
+        ],
+      };
+      final next = reorderPreviewExercisesOnDraft(draft, 0, 0, 1);
+      final names = ((next['preview_days'] as List).first['exercises'] as List)
+          .map((ex) => (ex as Map)['name'])
+          .toList();
+      expect(names, ['Fly', 'Press']);
+    });
+  });
 }

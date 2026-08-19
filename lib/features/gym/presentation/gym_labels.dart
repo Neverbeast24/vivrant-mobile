@@ -956,6 +956,31 @@ Map<String, dynamic> moveKeptDayOnDraft(
   return {...draft, 'kept_days': kept};
 }
 
+/// Reorder moves inside a generated preview day.
+Map<String, dynamic> reorderPreviewExercisesOnDraft(
+  Map<String, dynamic> draft,
+  int dayIndex,
+  int from,
+  int to,
+) {
+  final preview = [
+    for (final raw in (draft['preview_days'] as List? ?? const []))
+      if (raw is Map) Map<String, dynamic>.from(raw),
+  ];
+  if (dayIndex < 0 || dayIndex >= preview.length) return draft;
+  final exercises = [
+    for (final raw in (preview[dayIndex]['exercises'] as List? ?? const []))
+      if (raw is Map) Map<String, dynamic>.from(raw),
+  ];
+  if (from < 0 || to < 0 || from >= exercises.length || to >= exercises.length || from == to) {
+    return draft;
+  }
+  final moved = exercises.removeAt(from);
+  exercises.insert(to, moved);
+  preview[dayIndex] = {...preview[dayIndex], 'exercises': exercises};
+  return {...draft, 'preview_days': preview};
+}
+
 int restRemainingSeconds(int? restEndsAtMs, [DateTime? now]) {
   if (restEndsAtMs == null || restEndsAtMs <= 0) return 0;
   final left = restEndsAtMs - (now ?? DateTime.now()).millisecondsSinceEpoch;
