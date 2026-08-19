@@ -527,7 +527,7 @@ List<int> resolveTrainingDays({
     labeled.add(iso);
   }
   labeled.sort();
-  if (labeled.length >= 2) return labeled.take(6).toList();
+  if (labeled.isNotEmpty) return labeled.take(6).toList();
   return defaultTrainingDaysFromCount(daysPerWeek ?? (days.isEmpty ? 3 : days.length));
 }
 
@@ -652,6 +652,48 @@ String formatRestClock(int totalSeconds) {
   final m = s ~/ 60;
   final r = s % 60;
   return '$m:${r.toString().padLeft(2, '0')}';
+}
+
+const gymProgramDraftKey = 'vivrant.gym.programDraft.v1';
+const gymLiveSessionKey = 'vivrant.gym.liveSession.v2';
+
+Map<String, dynamic> keptDaysMap(Map<String, dynamic>? draft) {
+  final raw = draft?['kept_days'];
+  if (raw is! Map) return {};
+  return raw.map((key, value) => MapEntry(key.toString(), value));
+}
+
+List<int> keptIsoList(Map<String, dynamic>? draft) {
+  final out = <int>[];
+  for (final key in keptDaysMap(draft).keys) {
+    final iso = int.tryParse(key) ?? 0;
+    if (iso >= 1 && iso <= 7 && !out.contains(iso)) out.add(iso);
+  }
+  out.sort();
+  return out;
+}
+
+List<int> remainingTrainingDays(List<int> trainingDays, Map<String, dynamic>? draft) {
+  final kept = keptIsoList(draft).toSet();
+  return trainingDays.where((iso) => !kept.contains(iso)).toList();
+}
+
+int restRemainingSeconds(int? restEndsAtMs, [DateTime? now]) {
+  if (restEndsAtMs == null || restEndsAtMs <= 0) return 0;
+  final left = restEndsAtMs - (now ?? DateTime.now()).millisecondsSinceEpoch;
+  if (left <= 0) return 0;
+  return ((left + 999) / 1000).floor();
+}
+
+int restEndsAtFromSeconds(int remaining, [DateTime? now]) {
+  return (now ?? DateTime.now()).millisecondsSinceEpoch + remaining.clamp(0, 600) * 1000;
+}
+
+String todaySessionDate([DateTime? date]) {
+  final now = date ?? DateTime.now();
+  final m = now.month.toString().padLeft(2, '0');
+  final d = now.day.toString().padLeft(2, '0');
+  return '${now.year}-$m-$d';
 }
 
 Color difficultyColor(String difficulty) {

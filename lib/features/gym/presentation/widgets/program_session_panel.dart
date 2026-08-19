@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,7 +9,9 @@ import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
+import '../../../../shared/providers/persistent_store.dart';
 import '../gym_labels.dart';
+import '../gym_rest_alert.dart';
 
 class ProgramSessionPanel extends ConsumerStatefulWidget {
   const ProgramSessionPanel({
@@ -54,23 +55,38 @@ class _RunnerItem {
   final String? swap;
 }
 
-class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
+class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
+    with WidgetsBindingObserver {
   int? _planId;
   Map<String, List<bool>> _checks = {};
   Map<String, String> _names = {};
   DateTime? _startedAt;
   bool _saving = false;
+  bool _restored = false;
 
   Timer? _ticker;
-  int _restLeft = 0;
+  Timer? _syncTimer;
+  int? _restEndsAtMs;
   int _restTotal = 0;
   String? _restLabel;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _planId = widget.plans.isEmpty ? null : (widget.plans.first['id'] as num?)?.toInt();
     _resetFromPlan();
+    _restoreSession();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _catchUpRest();
+      setState(() {});
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _persistSession();
+    }
   }
 
   @override
@@ -84,7 +100,9 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _syncTimer?.cancel();
     super.dispose();
   }
 
@@ -170,6 +188,148 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
     _names = {for (final item in items) item.key: item.name};
   }
 
+  int get _restLeft => restRemainingSeconds(_restEndsAtMs);
+
+  bool get _hasProgress {
+    if (_startedAt != null) return true;
+    return _checks.values.any((row) => row.any((on) => on));
+  }
+
+  Map<String, dynamic> _sessionPayload() {
+    final plan = _plan;
+    final today = _today;
+    return {
+      'plan_id': (plan?['id'] as num?)?.toInt() ?? _planId ?? 0,
+      'day_label': today?['day']?.toString() ?? '',
+      'session_date': todaySessionDate(),
+      'checks': _checks,
+      'names': _names,
+      'started_at': _startedAt?.millisecondsSinceEpoch,
+      'rest_ends_at': _restEndsAtMs,
+      'rest_label': _restLabel,
+      'rest_total': _restTotal,
+      'rest_alerted': false,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<void> _persistSession() async {
+    if (_plan == null || _today == null) return;
+    final payload = _sessionPayload();
+    await PersistentStore.instance.writeJson(gymLiveSessionKey, payload);
+    if (!_hasProgress && _restEndsAtMs == null) return;
+    _syncTimer?.cancel();
+    _syncTimer = Timer(const Duration(milliseconds: 700), () async {
+      try {
+        await ref.read(vivrantApiProvider).saveGymLiveSession(payload);
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _clearPersistedSession() async {
+    await PersistentStore.instance.writeJson(gymLiveSessionKey, null);
+    try {
+      await ref.read(vivrantApiProvider).clearGymLiveSession();
+    } catch (_) {}
+  }
+
+  bool _matchesSession(Map<String, dynamic>? saved) {
+    if (saved == null) return false;
+    final plan = _plan;
+    final today = _today;
+    if (plan == null || today == null) return false;
+    final planId = (saved['plan_id'] as num?)?.toInt();
+    return planId == (plan['id'] as num?)?.toInt() &&
+        saved['day_label']?.toString() == today['day']?.toString() &&
+        saved['session_date']?.toString() == todaySessionDate();
+  }
+
+  void _applySaved(Map<String, dynamic> saved) {
+    final items = _items;
+    _checks = {
+      for (final item in items)
+        item.key: List<bool>.generate(item.setCount, (i) {
+          final row = saved['checks'] is Map ? (saved['checks'] as Map)[item.key] : null;
+          if (row is List && i < row.length) return row[i] == true;
+          return false;
+        }),
+    };
+    final names = saved['names'];
+    if (names is Map) {
+      for (final item in items) {
+        final value = names[item.key]?.toString();
+        if (value != null && value.isNotEmpty) _names[item.key] = value;
+      }
+    }
+    final started = saved['started_at'];
+    if (started is num && started > 0) {
+      _startedAt = DateTime.fromMillisecondsSinceEpoch(started.round());
+    } else if (started is String) {
+      _startedAt = DateTime.tryParse(started);
+    }
+    final restEnds = saved['rest_ends_at'];
+    if (restEnds is num && restEnds > 0) {
+      _restEndsAtMs = restEnds.round();
+    } else if (restEnds is String) {
+      _restEndsAtMs = DateTime.tryParse(restEnds)?.millisecondsSinceEpoch;
+    }
+    _restLabel = saved['rest_label']?.toString();
+    _restTotal = (saved['rest_total'] as num?)?.toInt() ?? _restLeft;
+    _restored = _hasProgress;
+    _catchUpRest();
+  }
+
+  Future<void> _restoreSession() async {
+    final local = await PersistentStore.instance.readJson(gymLiveSessionKey);
+    Map<String, dynamic>? remote;
+    try {
+      remote = await ref.read(vivrantApiProvider).gymLiveSession();
+    } catch (_) {}
+    if (!mounted) return;
+    final localOk = _matchesSession(local) ? local : null;
+    final remoteOk = _matchesSession(remote) ? remote : null;
+    Map<String, dynamic>? chosen = remoteOk ?? localOk;
+    if (localOk != null && remoteOk != null) {
+      final localAt = DateTime.tryParse(localOk['updated_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final remoteAt = DateTime.tryParse(remoteOk['updated_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      chosen = remoteAt.isAfter(localAt) ? remoteOk : localOk;
+    }
+    if (chosen == null) return;
+    setState(() => _applySaved(chosen!));
+    if (_restEndsAtMs != null && _restLeft > 0) _resumeTicker();
+  }
+
+  void _catchUpRest() {
+    if (_restEndsAtMs == null) return;
+    if (_restLeft > 0) return;
+    final label = _restLabel;
+    _ticker?.cancel();
+    _restEndsAtMs = null;
+    _restLabel = null;
+    _restTotal = 0;
+    GymRestAlert.fire();
+    if (label != null && mounted) {
+      context.showSuccess('Rest done — next set');
+    }
+  }
+
+  void _resumeTicker() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_restLeft <= 0) {
+        timer.cancel();
+        _catchUpRest();
+        setState(() {});
+        return;
+      }
+      setState(() {});
+    });
+  }
+
   int get _doneCount =>
       _checks.values.fold<int>(0, (sum, row) => sum + row.where((on) => on).length);
 
@@ -187,35 +347,22 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
     if (seconds <= 0) return;
     _ticker?.cancel();
     setState(() {
-      _restLeft = seconds;
+      _restEndsAtMs = restEndsAtFromSeconds(seconds);
       _restTotal = seconds;
       _restLabel = label;
     });
-    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_restLeft <= 1) {
-        timer.cancel();
-        HapticFeedback.mediumImpact();
-        setState(() {
-          _restLeft = 0;
-          _restLabel = null;
-        });
-        context.showSuccess('Rest done — next set');
-        return;
-      }
-      setState(() => _restLeft--);
-    });
+    _resumeTicker();
+    _persistSession();
   }
 
   void _skipRest() {
     _ticker?.cancel();
     setState(() {
-      _restLeft = 0;
+      _restEndsAtMs = null;
       _restLabel = null;
+      _restTotal = 0;
     });
+    _persistSession();
   }
 
   void _toggleSet(_RunnerItem item, int index) {
@@ -225,8 +372,9 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
       _checks[item.key] = current;
       _startedAt ??= DateTime.now();
     });
+    _persistSession();
     if (!current[index]) return;
-    HapticFeedback.selectionClick();
+    GymRestAlert.tick();
     final stillOpen = _items.any((row) {
       final rowChecks = row.key == item.key ? current : (_checks[row.key] ?? const <bool>[]);
       return rowChecks.any((on) => !on);
@@ -241,8 +389,9 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
       _checks[item.key] = List<bool>.filled(item.setCount, !allOn);
       if (!allOn) _startedAt ??= DateTime.now();
     });
+    _persistSession();
     if (allOn) return;
-    HapticFeedback.selectionClick();
+    GymRestAlert.tick();
     _startRest(item.restSeconds, _names[item.key] ?? item.name);
   }
 
@@ -253,6 +402,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
       final current = _names[item.key] ?? item.name;
       _names[item.key] = current == item.originalName ? swap : item.originalName;
     });
+    _persistSession();
   }
 
   Future<void> _save() async {
@@ -292,9 +442,13 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
         _saving = false;
         _startedAt = null;
         _restLabel = null;
-        _restLeft = 0;
+        _restEndsAtMs = null;
+        _restTotal = 0;
+        _restored = false;
         _resetFromPlan();
       });
+      await _clearPersistedSession();
+      if (!mounted) return;
       context.showSuccess('Workout saved from your program');
       widget.onLogged?.call();
     } catch (e) {
@@ -351,9 +505,20 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Check off each set. Rest starts from the program — skip anytime.',
+            'Check off each set. Rest starts from the program — skip anytime. Leave and come back: your sets and rest timer stay.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          if (_restored) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Restored your in-progress workout.',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: c.accent,
+                fontSize: 12,
+              ),
+            ),
+          ],
           if (widget.plans.length > 1) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(

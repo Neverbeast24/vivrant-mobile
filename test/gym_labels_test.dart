@@ -114,4 +114,28 @@ void main() {
       expect(gymSessionFocusFromPlan('HIIT'), 'endurance');
     });
   });
+
+  group('program builder helpers', () {
+    test('lists remaining weekdays after a kept day', () {
+      expect(
+        remainingTrainingDays(
+          [1, 3, 5],
+          {
+            'kept_days': {
+              '1': {'day': 'Monday · Pull', 'focus': 'Pull'},
+            },
+          },
+        ),
+        [3, 5],
+      );
+    });
+
+    test('counts remaining rest from an end timestamp', () {
+      final now = DateTime.fromMillisecondsSinceEpoch(1_000_000);
+      final ends = restEndsAtFromSeconds(90, now);
+      expect(restRemainingSeconds(ends, now), 90);
+      expect(restRemainingSeconds(ends, now.add(const Duration(seconds: 30))), 60);
+      expect(restRemainingSeconds(ends, now.add(const Duration(seconds: 120))), 0);
+    });
+  });
 }

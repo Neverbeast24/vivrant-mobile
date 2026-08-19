@@ -144,7 +144,82 @@ ShareExportDoc gymPlanDoc(Map<String, dynamic> plan) {
     filename: filenameSlug(title),
     text: _heading(title, lines),
     csv: toCsv(csvRows),
-    json: _jsonEncode(plan),
+    json: _jsonEncode({
+      'title': title,
+      'focus': plan['focus'],
+      'level': plan['level'],
+      'days_per_week': daysPerWeek,
+      'training_days': trainingDays,
+      'summary': summary,
+      'recommendations': recs,
+      'days': days,
+    }),
+  );
+}
+
+ShareExportDoc gymProgramDraftDoc(Map<String, dynamic> draft) {
+  final keptRaw = draft['kept_days'];
+  final kept = keptRaw is Map
+      ? keptRaw.map((key, value) => MapEntry(key.toString(), value))
+      : <String, dynamic>{};
+  final trainingDays = (draft['training_days'] as List? ?? const [])
+      .whereType<num>()
+      .map((n) => n.round())
+      .where((n) => n >= 1 && n <= 7)
+      .toList()
+    ..sort();
+  final keptIsos = kept.keys.map((k) => int.tryParse(k) ?? 0).where((n) => n >= 1 && n <= 7).toList()
+    ..sort();
+  const weekdayShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final remaining = trainingDays.where((iso) => !keptIsos.contains(iso)).toList();
+  final remainingLabel = remaining.map((iso) => weekdayShort[iso - 1]).join(', ');
+  final keptDays = [
+    for (final iso in keptIsos)
+      if (kept['$iso'] is Map) Map<String, dynamic>.from(kept['$iso'] as Map),
+  ];
+  final keptPlan = {
+    ...draft,
+    'title': '${draft['title'] ?? 'Training program'} — days you kept',
+    'days': keptDays,
+    'training_days': keptIsos,
+    'days_per_week': keptIsos.length,
+  };
+  final keptDoc = gymPlanDoc(keptPlan);
+  final preview = (draft['preview_days'] as List? ?? const [])
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e));
+  final previewLines = <String>[
+    remaining.isEmpty ? 'All training days kept.' : 'Still to pick: $remainingLabel',
+    '',
+    keptDoc.text.trimRight(),
+    '',
+    'Latest generated options',
+    '',
+  ];
+  for (final day in preview) {
+    previewLines.add('${day['day'] ?? 'Day'} — ${humanizeLabel(day['focus']?.toString() ?? '')}');
+    final exercises = (day['exercises'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e));
+    for (final ex in exercises) {
+      previewLines.add('• ${ex['name'] ?? 'Movement'} · ${ex['sets'] ?? ''} · rest ${ex['rest'] ?? ''}');
+    }
+    previewLines.add('');
+  }
+  return ShareExportDoc(
+    title: '${draft['title'] ?? 'Training program'} (in progress)',
+    filename: filenameSlug('${draft['title'] ?? 'program'}-draft'),
+    text: _heading('${draft['title'] ?? 'Training program'} (in progress)', previewLines),
+    csv: keptDoc.csv,
+    json: _jsonEncode({
+      'title': draft['title'],
+      'focus': draft['focus'],
+      'level': draft['level'],
+      'training_days': trainingDays,
+      'kept_days': kept,
+      'preview_days': draft['preview_days'],
+      'remaining_days': remaining,
+    }),
   );
 }
 

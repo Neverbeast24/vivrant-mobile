@@ -12,6 +12,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
 import '../../../../shared/providers/module_cache.dart';
+import '../../../../shared/providers/persistent_store.dart';
 import '../gym_labels.dart';
 import '../widgets/exercise_demo_sheet.dart';
 
@@ -37,6 +38,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   final _sessionCtrl = TextEditingController(text: '45');
 
   List<Map<String, dynamic>> _plans = [];
+  Map<String, dynamic>? _draft;
   List<GymExercise> _exercises = const [];
   final Set<String> _knownSlugs = {};
   final List<String> _customExercises = [];
@@ -63,6 +65,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       _loading = false;
     }
     _restorePrefs();
+    _restoreDraft();
     _load();
   }
 
@@ -100,6 +103,17 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
         ..clear()
         ..addAll(sanitizeAvoidTargets(prefs.getStringList(_prefsAvoidKey) ?? const []));
     });
+  }
+
+  Future<void> _restoreDraft() async {
+    final local = await PersistentStore.instance.readJson(gymProgramDraftKey);
+    if (!mounted) return;
+    if (local != null) setState(() => _draft = local);
+  }
+
+  Future<void> _persistDraft(Map<String, dynamic>? draft) async {
+    setState(() => _draft = draft);
+    await PersistentStore.instance.writeJson(gymProgramDraftKey, draft);
   }
 
   Future<void> _persistPrefs() async {
@@ -146,9 +160,17 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       final api = ref.read(vivrantApiProvider);
       final plans = await api.gymPlans();
       final exerciseRows = await api.gymExercises();
+      Map<String, dynamic>? draft;
+      try {
+        draft = await api.gymProgramDraft();
+      } catch (_) {
+        draft = _draft;
+      }
       if (!mounted) return;
       final exercises = exerciseRows.map(GymExercise.fromJson).toList(growable: false);
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymPlans, plans);
+      await PersistentStore.instance.writeJson('vivrant.gym.plans.snap', plans);
+      if (draft != null) await _persistDraft(draft);
       setState(() {
         _plans = plans;
         _exercises = exercises;
@@ -174,7 +196,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     setState(() => _generating = true);
     try {
       await _persistPrefs();
-      await ref.read(vivrantApiProvider).createAiGymPlan(
+      final result = await ref.read(vivrantApiProvider).createAiGymPlan(
             daysPerWeek: _daysPerWeek,
             trainingDays: _trainingDays,
             sessionMinutes: _sessionMinutes,
@@ -184,9 +206,65 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             avoidTargets: _avoidTargets.toList(),
           );
       if (!mounted) return;
+      final draft = result['draft'] is Map
+          ? Map<String, dynamic>.from(result['draft'] as Map)
+          : null;
+      if (draft != null) await _persistDraft(draft);
+      if (!mounted) return;
       showAppSnackBar(
         context,
-        message: 'Your program is ready',
+        message: 'Workouts ready — keep the days you like',
+        tone: SnackTone.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
+
+  Future<void> _keepDay(int iso) async {
+    try {
+      final result = await ref.read(vivrantApiProvider).gymProgramDraftAction(
+            action: 'keep',
+            iso: iso,
+          );
+      final draft = result['draft'] is Map
+          ? Map<String, dynamic>.from(result['draft'] as Map)
+          : null;
+      if (draft != null) await _persistDraft(draft);
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _dropDay(int iso) async {
+    try {
+      final result = await ref.read(vivrantApiProvider).gymProgramDraftAction(
+            action: 'drop',
+            iso: iso,
+          );
+      final draft = result['draft'] is Map
+          ? Map<String, dynamic>.from(result['draft'] as Map)
+          : null;
+      if (draft != null) await _persistDraft(draft);
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _saveDraftProgram() async {
+    try {
+      await ref.read(vivrantApiProvider).commitGymProgramDraft();
+      if (!mounted) return;
+      await _persistDraft(null);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Program saved from the days you kept',
         tone: SnackTone.success,
         actionLabel: 'Start today',
         onAction: () => context.push('/gym/sessions'),
@@ -195,8 +273,17 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     } catch (e) {
       if (!mounted) return;
       context.showError(apiErrorMessage(e));
-    } finally {
-      if (mounted) setState(() => _generating = false);
+    }
+  }
+
+  Future<void> _discardDraft() async {
+    try {
+      await ref.read(vivrantApiProvider).discardGymProgramDraft();
+      if (!mounted) return;
+      await _persistDraft(null);
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
     }
   }
 
@@ -359,7 +446,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               highlight: 'program',
             ),
             Text(
-              'Pick the weekdays you train. Workouts and reminders follow this calendar — rest days stay rest days.',
+              'Pick the weekdays you train. Generate workouts, keep the days you like, generate again for the rest, then save — nothing hits your program list until you keep it.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
@@ -465,7 +552,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                       onPressed: _generating ? null : _createAi,
                       icon: const Icon(Icons.auto_awesome),
                       label: Text(
-                        _generating ? 'Creating your program…' : 'Create my program',
+                        _generating ? 'Generating workouts…' : 'Generate workouts',
                       ),
                     ),
                   ),
@@ -643,6 +730,18 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
               ),
             ),
             const SizedBox(height: 18),
+            if (_draft != null)
+              _ProgramDraftPanel(
+                draft: _draft!,
+                generating: _generating,
+                onKeep: _keepDay,
+                onDrop: _dropDay,
+                onGenerate: _createAi,
+                onSave: _saveDraftProgram,
+                onDiscard: _discardDraft,
+                onShare: () => showShareExportSheet(context, gymProgramDraftDoc(_draft!)),
+              ),
+            if (_draft != null) const SizedBox(height: 18),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
@@ -659,10 +758,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             else if (_plans.isEmpty)
               EmptyState(
                 title: 'No program yet',
-                message: 'Choose how often you train and your experience above, then create a program.',
+                message: 'Choose how often you train and your experience above, then generate workouts and keep the days you like.',
                 action: ElevatedButton(
                   onPressed: _generating ? null : _createAi,
-                  child: const Text('Create my program'),
+                  child: const Text('Generate workouts'),
                 ),
               )
             else ...[
@@ -743,6 +842,170 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProgramDraftPanel extends StatelessWidget {
+  const _ProgramDraftPanel({
+    required this.draft,
+    required this.generating,
+    required this.onKeep,
+    required this.onDrop,
+    required this.onGenerate,
+    required this.onSave,
+    required this.onDiscard,
+    required this.onShare,
+  });
+
+  final Map<String, dynamic> draft;
+  final bool generating;
+  final ValueChanged<int> onKeep;
+  final ValueChanged<int> onDrop;
+  final VoidCallback onGenerate;
+  final VoidCallback onSave;
+  final VoidCallback onDiscard;
+  final VoidCallback onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final trainingDays = (draft['training_days'] as List? ?? const [])
+        .whereType<num>()
+        .map((n) => n.round())
+        .where((n) => n >= 1 && n <= 7)
+        .toList();
+    final kept = keptDaysMap(draft);
+    final remaining = remainingTrainingDays(trainingDays, draft);
+    final keptCount = keptIsoList(draft).length;
+    final preview = (draft['preview_days'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final remainingLabel = remaining
+        .map((iso) => gymWeekdays.firstWhere((item) => item.iso == iso).short)
+        .join(', ');
+
+    return VivrantPanel(
+      title: 'Build your week',
+      trailing: IconButton(
+        tooltip: 'Share or export draft',
+        onPressed: onShare,
+        icon: const Icon(Icons.ios_share_rounded),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Keep the days you like. Skip the rest, generate again, and pick the next day — nothing is saved to your program list until you tap Save program.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            remaining.isEmpty
+                ? '$keptCount/${trainingDays.length} days kept · ready to save'
+                : '$keptCount/${trainingDays.length} days kept · still need $remainingLabel',
+            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final iso in trainingDays)
+                Builder(
+                  builder: (context) {
+                    final weekday = gymWeekdays.firstWhere((item) => item.iso == iso);
+                    final keptDay = kept['$iso'] is Map
+                        ? Map<String, dynamic>.from(kept['$iso'] as Map)
+                        : null;
+                    return InputChip(
+                      selected: keptDay != null,
+                      label: Text(
+                        keptDay == null
+                            ? weekday.short
+                            : '${weekday.short} · ${humanizeLabel(keptDay['focus']?.toString() ?? '')}',
+                      ),
+                      onDeleted: keptDay == null ? null : () => onDrop(iso),
+                      onPressed: keptDay == null ? null : () => onDrop(iso),
+                    );
+                  },
+                ),
+            ],
+          ),
+          if (preview.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Latest generated workouts',
+              style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            for (final day in preview)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${day['day'] ?? 'Day'} · ${humanizeLabel(day['focus']?.toString() ?? '')}',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    for (final raw in (day['exercises'] as List? ?? const []))
+                      Text(
+                        formatGymExerciseLine(Map<String, dynamic>.from(raw as Map)),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          final iso = weekdayIsoFromLabel(day['day']?.toString() ?? '');
+                          if (iso != null) onKeep(iso);
+                        },
+                        icon: const Icon(Icons.check_rounded, size: 16),
+                        label: Text(
+                          kept['${weekdayIsoFromLabel(day['day']?.toString() ?? '')}'] != null
+                              ? 'Replace kept day'
+                              : 'Keep this day',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: generating ? null : onGenerate,
+              icon: const Icon(Icons.auto_awesome),
+              label: Text(
+                generating
+                    ? 'Generating…'
+                    : remaining.isEmpty
+                        ? 'Generate new options'
+                        : 'Generate remaining days',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: keptCount == 0 ? null : onSave,
+              child: Text(
+                'Save program · $keptCount day${keptCount == 1 ? '' : 's'}',
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onDiscard,
+            child: const Text('Clear draft'),
+          ),
+        ],
       ),
     );
   }

@@ -66,6 +66,51 @@ extension VivrantGymApi on VivrantApi {
     return Map<String, dynamic>.from(res.data ?? {});
   }
 
+  Future<Map<String, dynamic>?> gymProgramDraft() async {
+    final res = await _client.get<Map<String, dynamic>>('/api/mobile/gym/plans/draft');
+    final draft = res.data?['draft'];
+    return draft is Map ? Map<String, dynamic>.from(draft) : null;
+  }
+
+  Future<Map<String, dynamic>> gymProgramDraftAction({
+    required String action,
+    int? iso,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/gym/plans/draft',
+      data: {
+        'action': action,
+        if (iso != null) 'iso': iso,
+      },
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
+  Future<Map<String, dynamic>> commitGymProgramDraft() async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/gym/plans/draft/commit',
+    );
+    return Map<String, dynamic>.from(res.data ?? {});
+  }
+
+  Future<void> discardGymProgramDraft() async {
+    await _client.delete('/api/mobile/gym/plans/draft');
+  }
+
+  Future<Map<String, dynamic>?> gymLiveSession() async {
+    final res = await _client.get<Map<String, dynamic>>('/api/mobile/gym/sessions/live');
+    final session = res.data?['session'];
+    return session is Map ? Map<String, dynamic>.from(session) : null;
+  }
+
+  Future<void> saveGymLiveSession(Map<String, dynamic> body) async {
+    await _client.put('/api/mobile/gym/sessions/live', data: body);
+  }
+
+  Future<void> clearGymLiveSession() async {
+    await _client.delete('/api/mobile/gym/sessions/live');
+  }
+
   Future<List<Map<String, dynamic>>> gymPlans() async {
     final res =
         await _client.get<Map<String, dynamic>>('/api/mobile/gym/plans');
