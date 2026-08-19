@@ -149,7 +149,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/gym', builder: (_, __) => const GymOverviewScreen()),
       GoRoute(path: '/gym/demos', builder: (_, __) => const GymDemosScreen()),
       GoRoute(path: '/gym/machines', builder: (_, __) => const GymMachinesScreen()),
-      GoRoute(path: '/gym/sessions', builder: (_, __) => const GymSessionsScreen()),
+      GoRoute(
+        path: '/gym/sessions',
+        builder: (context, state) {
+          final plan = int.tryParse(state.uri.queryParameters['plan'] ?? '');
+          final day = state.uri.queryParameters['day'];
+          return GymSessionsScreen(
+            initialPlanId: plan,
+            initialDayLabel: day,
+          );
+        },
+      ),
       GoRoute(path: '/gym/plans', builder: (_, __) => const GymPlansScreen()),
       GoRoute(path: '/sleep', builder: (_, __) => const SleepScreen()),
       GoRoute(path: '/hydration', builder: (_, __) => const HydrationScreen()),

@@ -12,7 +12,14 @@ import '../gym_labels.dart';
 import '../widgets/program_session_panel.dart';
 
 class GymSessionsScreen extends ConsumerStatefulWidget {
-  const GymSessionsScreen({super.key});
+  const GymSessionsScreen({
+    super.key,
+    this.initialPlanId,
+    this.initialDayLabel,
+  });
+
+  final int? initialPlanId;
+  final String? initialDayLabel;
 
   @override
   ConsumerState<GymSessionsScreen> createState() => _GymSessionsScreenState();
@@ -243,6 +250,8 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
               ProgramSessionPanel(
                 plans: _plans,
                 onLogged: _load,
+                initialPlanId: widget.initialPlanId,
+                initialDayLabel: widget.initialDayLabel,
               ),
               const SizedBox(height: 16),
             ],

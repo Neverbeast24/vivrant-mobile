@@ -788,6 +788,32 @@ Map<String, dynamic>? pickTodaysPlanDay(
   return index < days.length ? days[index] : null;
 }
 
+Map<String, dynamic>? findPlanDayByLabel(List<Map<String, dynamic>> days, String? label) {
+  if (days.isEmpty || label == null) return null;
+  final needle = label.trim().toLowerCase();
+  if (needle.isEmpty) return null;
+  for (final day in days) {
+    if ((day['day']?.toString() ?? '').trim().toLowerCase() == needle) return day;
+  }
+  final iso = weekdayIsoFromLabel(needle);
+  if (iso == null) return null;
+  for (final day in days) {
+    if (weekdayIsoFromLabel(day['day']?.toString() ?? '') == iso) return day;
+  }
+  return null;
+}
+
+Map<String, dynamic>? resolveSessionPlanDay(
+  List<Map<String, dynamic>> days, {
+  String? label,
+  DateTime? date,
+  List<int>? trainingDays,
+}) {
+  final labeled = findPlanDayByLabel(days, label);
+  if (labeled != null) return labeled;
+  return pickTodaysPlanDay(days, date, trainingDays);
+}
+
 List<int>? planTrainingDaysList(Map<String, dynamic>? plan) {
   final raw = plan?['training_days'];
   if (raw is! List) return null;

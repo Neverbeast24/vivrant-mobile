@@ -1158,6 +1158,18 @@ class _PlanCard extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onDelete;
 
+  void _openSession(BuildContext context, {String? day}) {
+    final planId = (plan['id'] as num?)?.toInt();
+    final uri = Uri(
+      path: '/gym/sessions',
+      queryParameters: {
+        if (planId != null) 'plan': '$planId',
+        if (day != null && day.isNotEmpty) 'day': day,
+      },
+    );
+    context.push(uri.toString());
+  }
+
   @override
   Widget build(BuildContext context) {
     final daysPerWeek = plan['days_per_week'] ?? (plan['days'] is List ? (plan['days'] as List).length : null);
@@ -1240,15 +1252,28 @@ class _PlanCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (today != null) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push('/gym/sessions'),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text("Start today's workout"),
-                ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openSession(context, day: today?['day']?.toString()),
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(today == null ? 'Start a saved day' : "Start today's workout"),
+              ),
+            ),
+            if (days.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final day in days)
+                    ActionChip(
+                      avatar: const Icon(Icons.play_arrow_rounded, size: 16),
+                      label: Text(day['day']?.toString() ?? 'Day'),
+                      onPressed: () => _openSession(context, day: day['day']?.toString()),
+                    ),
+                ],
               ),
             ],
             if (summary != null && summary.isNotEmpty) ...[
@@ -1405,6 +1430,14 @@ class _PlanCard extends StatelessWidget {
                       );
                     },
                   ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => _openSession(context, day: day['day']?.toString()),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                    label: const Text('Start this day'),
+                  ),
+                ),
                 if (dayAlternatives(day).isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(

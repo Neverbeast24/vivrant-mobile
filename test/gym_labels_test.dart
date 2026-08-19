@@ -130,6 +130,27 @@ void main() {
       );
     });
 
+    test('picks a saved day by weekday even when it is not today', () {
+      final named = [
+        {'day': 'Monday · Pull', 'focus': 'Pull', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Wednesday · Push', 'focus': 'Push', 'exercises': <Map<String, dynamic>>[]},
+      ];
+      expect(findPlanDayByLabel(named, 'Wednesday · Push')?['focus'], 'Push');
+      expect(findPlanDayByLabel(named, 'monday')?['focus'], 'Pull');
+    });
+
+    test('picks Day 2 labels without treating them as Tuesday', () {
+      final numbered = [
+        {'day': 'Day 1: Upper Body Push & Core', 'focus': 'Push', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Day 2: Lower Body Quads & Calves', 'focus': 'Legs', 'exercises': <Map<String, dynamic>>[]},
+      ];
+      expect(findPlanDayByLabel(numbered, 'Day 2: Lower Body Quads & Calves')?['focus'], 'Legs');
+      expect(
+        resolveSessionPlanDay(numbered, label: 'Day 2: Lower Body Quads & Calves')?['focus'],
+        'Legs',
+      );
+    });
+
     test('counts remaining rest from an end timestamp', () {
       final now = DateTime.fromMillisecondsSinceEpoch(1_000_000);
       final ends = restEndsAtFromSeconds(90, now);

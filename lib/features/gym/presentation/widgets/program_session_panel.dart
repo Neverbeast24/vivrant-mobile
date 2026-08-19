@@ -18,10 +18,16 @@ class ProgramSessionPanel extends ConsumerStatefulWidget {
     super.key,
     required this.plans,
     this.onLogged,
+    this.initialPlanId,
+    this.initialDayLabel,
+    this.allowDayPick = true,
   });
 
   final List<Map<String, dynamic>> plans;
   final VoidCallback? onLogged;
+  final int? initialPlanId;
+  final String? initialDayLabel;
+  final bool allowDayPick;
 
   @override
   ConsumerState<ProgramSessionPanel> createState() => _ProgramSessionPanelState();
@@ -58,6 +64,7 @@ class _RunnerItem {
 class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
     with WidgetsBindingObserver {
   int? _planId;
+  String _dayLabel = '';
   Map<String, List<bool>> _checks = {};
   Map<String, String> _names = {};
   DateTime? _startedAt;
@@ -74,7 +81,9 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _planId = widget.plans.isEmpty ? null : (widget.plans.first['id'] as num?)?.toInt();
+    _planId = widget.initialPlanId ??
+        (widget.plans.isEmpty ? null : (widget.plans.first['id'] as num?)?.toInt());
+    _dayLabel = widget.initialDayLabel ?? '';
     _resetFromPlan();
     _restoreSession();
   }
@@ -92,10 +101,20 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
   @override
   void didUpdateWidget(covariant ProgramSessionPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_planId == null && widget.plans.isNotEmpty) {
-      _planId = (widget.plans.first['id'] as num?)?.toInt();
-      _resetFromPlan();
+    final plansArrived = oldWidget.plans.isEmpty && widget.plans.isNotEmpty;
+    final planHintChanged =
+        widget.initialPlanId != null && widget.initialPlanId != oldWidget.initialPlanId;
+    final dayHintChanged =
+        (widget.initialDayLabel ?? '') != (oldWidget.initialDayLabel ?? '') &&
+            (widget.initialDayLabel ?? '').isNotEmpty;
+    if (!plansArrived && !planHintChanged && !dayHintChanged && _planId != null) return;
+    if (widget.plans.isEmpty) return;
+    _planId = widget.initialPlanId ?? _planId ?? (widget.plans.first['id'] as num?)?.toInt();
+    if ((widget.initialDayLabel ?? '').isNotEmpty) {
+      _dayLabel = widget.initialDayLabel!;
     }
+    _resetFromPlan();
+    _restoreSession();
   }
 
   @override
@@ -114,7 +133,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
     return widget.plans.first;
   }
 
-  Map<String, dynamic>? get _today {
+  Map<String, dynamic>? get _calendarToday {
     final plan = _plan;
     if (plan == null) return null;
     final days = (plan['days'] as List? ?? const [])
@@ -124,10 +143,24 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
     return pickTodaysPlanDay(days, null, planTrainingDaysList(plan));
   }
 
+  Map<String, dynamic>? get _sessionDay {
+    final plan = _plan;
+    if (plan == null) return null;
+    final days = (plan['days'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    return resolveSessionPlanDay(
+      days,
+      label: widget.allowDayPick ? _dayLabel : null,
+      trainingDays: planTrainingDaysList(plan),
+    );
+  }
+
   List<_RunnerItem> get _items {
-    final today = _today;
-    if (today == null) return const [];
-    return _buildItems(today);
+    final day = _sessionDay;
+    if (day == null) return const [];
+    return _buildItems(day);
   }
 
   List<_RunnerItem> _buildItems(Map<String, dynamic> day) {
@@ -197,7 +230,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
 
   Map<String, dynamic> _sessionPayload() {
     final plan = _plan;
-    final today = _today;
+    final today = _sessionDay;
     return {
       'plan_id': (plan?['id'] as num?)?.toInt() ?? _planId ?? 0,
       'day_label': today?['day']?.toString() ?? '',
@@ -214,7 +247,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
   }
 
   Future<void> _persistSession() async {
-    if (_plan == null || _today == null) return;
+    if (_plan == null || _sessionDay == null) return;
     final payload = _sessionPayload();
     await PersistentStore.instance.writeJson(gymLiveSessionKey, payload);
     if (!_hasProgress && _restEndsAtMs == null) return;
@@ -236,7 +269,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
   bool _matchesSession(Map<String, dynamic>? saved) {
     if (saved == null) return false;
     final plan = _plan;
-    final today = _today;
+    final today = _sessionDay;
     if (plan == null || today == null) return false;
     final planId = (saved['plan_id'] as num?)?.toInt();
     return planId == (plan['id'] as num?)?.toInt() &&
@@ -407,7 +440,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
 
   Future<void> _save() async {
     final plan = _plan;
-    final today = _today;
+    final today = _sessionDay;
     if (plan == null || today == null) return;
     final logged = <Map<String, dynamic>>[];
     for (final item in _items) {
@@ -482,11 +515,47 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
     }
 
     final plan = _plan;
-    final today = _today;
+    final today = _sessionDay;
     if (plan == null || today == null) {
-      return const VivrantPanel(
-        title: "Today's program",
-        child: Text('Rest day — no session on your schedule today.'),
+      final days = (plan?['days'] as List? ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      return VivrantPanel(
+        title: widget.allowDayPick ? 'Saved program day' : "Today's program",
+        child: days.isNotEmpty && widget.allowDayPick
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Rest day on the calendar — pick a saved day to train anyway.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: null,
+                    decoration: const InputDecoration(labelText: 'Start a saved day'),
+                    items: [
+                      for (final day in days)
+                        DropdownMenuItem(
+                          value: day['day']?.toString(),
+                          child: Text(
+                            '${day['day'] ?? 'Day'} · ${humanizeLabel(day['focus']?.toString() ?? '')}',
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _dayLabel = value;
+                        _resetFromPlan();
+                      });
+                      _restoreSession();
+                    },
+                  ),
+                ],
+              )
+            : const Text('Rest day — no session on your schedule today.'),
       );
     }
 
@@ -536,8 +605,36 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
                 if (value == null) return;
                 setState(() {
                   _planId = value;
+                  _dayLabel = '';
                   _resetFromPlan();
                 });
+                _restoreSession();
+              },
+            ),
+          ],
+          if (widget.allowDayPick && ((plan['days'] as List?)?.length ?? 0) > 1) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey('${_planId}_$_dayLabel'),
+              initialValue: today['day']?.toString(),
+              decoration: const InputDecoration(labelText: 'Day'),
+              items: [
+                for (final raw in (plan['days'] as List? ?? const []))
+                  if (raw is Map)
+                    DropdownMenuItem(
+                      value: raw['day']?.toString(),
+                      child: Text(
+                        '${raw['day'] ?? 'Day'} · ${humanizeLabel(raw['focus']?.toString() ?? '')}${_calendarToday?['day']?.toString() == raw['day']?.toString() ? ' · today' : ''}',
+                      ),
+                    ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _dayLabel = value;
+                  _resetFromPlan();
+                });
+                _restoreSession();
               },
             ),
           ],
@@ -553,7 +650,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${today['day'] ?? 'Today'} · ${humanizeLabel(today['focus']?.toString() ?? '')}',
+                  '${today['day'] ?? 'Today'} · ${humanizeLabel(today['focus']?.toString() ?? '')}${_calendarToday?['day']?.toString() == today['day']?.toString() ? ' · today' : ''}',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
