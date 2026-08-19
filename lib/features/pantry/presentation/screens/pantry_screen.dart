@@ -311,6 +311,32 @@ class _PantryScreenState extends ConsumerState<PantryScreen> {
                                       ),
                                 ),
                               IconButton(
+                                icon: const Icon(Icons.edit_outlined),
+                                onPressed: () async {
+                                  final draft = await showFieldEditorSheet(
+                                    context,
+                                    title: 'Edit pantry item',
+                                    fields: {
+                                      'Name': item.name,
+                                      'Category': item.category,
+                                    },
+                                  );
+                                  if (draft == null || !mounted) return;
+                                  try {
+                                    final updated = await ref.read(vivrantApiProvider).updatePantry(item.id, {
+                                      'name': draft['Name'] ?? item.name,
+                                      'category': draft['Category'] ?? item.category,
+                                    });
+                                    if (!mounted) return;
+                                    _setItems([for (final row in _items) row.id == item.id ? updated : row]);
+                                    context.showSuccess('Item updated');
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    context.showError(apiErrorMessage(e));
+                                  }
+                                },
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.delete_outline),
                                 onPressed: () => _delete(item),
                               ),

@@ -267,6 +267,37 @@ class _JournalScreenState extends ConsumerState<JournalScreen> {
                             ),
                           ),
                           IconButton(
+                            tooltip: 'Edit',
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () async {
+                              final draft = await showFieldEditorSheet(
+                                context,
+                                title: 'Edit note',
+                                fields: {
+                                  'Title': e.title ?? '',
+                                  'Body': e.body,
+                                },
+                              );
+                              if (draft == null || !mounted) return;
+                              try {
+                                final updated = await ref.read(vivrantApiProvider).updateJournal(e.id, {
+                                  'title': (draft['Title'] ?? '').isEmpty ? 'Journal' : draft['Title'],
+                                  'body': draft['Body'] ?? e.body,
+                                  'entry_date': e.entryDate,
+                                  if (e.mood != null) 'mood': e.mood,
+                                });
+                                if (!mounted) return;
+                                _setEntries([
+                                  for (final item in _entries) item.id == e.id ? updated : item,
+                                ]);
+                                context.showSuccess('Entry updated');
+                              } catch (err) {
+                                if (!mounted) return;
+                                context.showError(apiErrorMessage(err));
+                              }
+                            },
+                          ),
+                          IconButton(
                             tooltip: 'Share or export',
                             icon: const Icon(Icons.ios_share_rounded),
                             onPressed: () =>

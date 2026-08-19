@@ -30,6 +30,16 @@ extension VivrantHouseholdApi on VivrantApi {
     await _client.delete('/api/mobile/groceries/$id');
   }
 
+  Future<GroceryItem> updateGrocery(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/groceries/$id',
+      data: body,
+    );
+    return GroceryItem.fromJson(
+      Map<String, dynamic>.from(res.data?['item'] ?? res.data ?? {}),
+    );
+  }
+
   Future<void> clearCompletedGroceries() async {
     await _client.post('/api/mobile/groceries/clear-completed');
   }
@@ -98,6 +108,16 @@ extension VivrantHouseholdApi on VivrantApi {
     );
   }
 
+  Future<PantryItem> updatePantry(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/pantry/$id',
+      data: body,
+    );
+    return PantryItem.fromJson(
+      Map<String, dynamic>.from(res.data?['item'] ?? res.data ?? {}),
+    );
+  }
+
   Future<void> deletePantry(int id) async {
     await _client.delete('/api/mobile/pantry/$id');
   }
@@ -133,6 +153,16 @@ extension VivrantHouseholdApi on VivrantApi {
 
   Future<void> deleteExpense(int id) async {
     await _client.delete('/api/mobile/spending/expenses/$id');
+  }
+
+  Future<Expense> updateExpense(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/spending/expenses/$id',
+      data: body,
+    );
+    return Expense.fromJson(
+      Map<String, dynamic>.from(res.data?['expense'] ?? res.data ?? {}),
+    );
   }
 
   Future<void> saveBudget(double amount) async {

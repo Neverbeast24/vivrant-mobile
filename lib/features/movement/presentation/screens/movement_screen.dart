@@ -238,6 +238,42 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                             ),
                           ),
                           IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () async {
+                              final draft = await showFieldEditorSheet(
+                                context,
+                                title: 'Edit workout',
+                                fields: {
+                                  'Title': w.title,
+                                  'Type': w.activityType,
+                                  'Minutes': '${w.durationMinutes ?? ''}',
+                                  'Calories': '${w.caloriesBurned?.toStringAsFixed(0) ?? ''}',
+                                },
+                              );
+                              if (draft == null || !mounted) return;
+                              try {
+                                const types = {'walk', 'run', 'strength', 'cycle', 'yoga', 'other'};
+                                final type = (draft['Type'] ?? w.activityType).toLowerCase();
+                                final updated = await ref.read(vivrantApiProvider).updateWorkout(w.id, {
+                                  'title': draft['Title'] ?? w.title,
+                                  'activity_type': types.contains(type) ? type : w.activityType,
+                                  'duration_minutes': int.tryParse(draft['Minutes'] ?? '') ?? w.durationMinutes ?? 1,
+                                  if ((draft['Calories'] ?? '').isNotEmpty)
+                                    'calories_burned': int.tryParse(draft['Calories']!),
+                                });
+                                if (!mounted) return;
+                                setState(() {
+                                  _items = [for (final item in _items) item.id == w.id ? updated : item];
+                                });
+                                ref.read(moduleCacheProvider).write(ModuleCacheKeys.movement, _items);
+                                context.showSuccess('Workout updated');
+                              } catch (e) {
+                                if (!mounted) return;
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.delete_outline),
                             onPressed: () async {
                               try {

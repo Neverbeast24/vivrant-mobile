@@ -26,6 +26,16 @@ extension VivrantMovementApi on VivrantApi {
     await _client.delete('/api/mobile/movement/workouts/$id');
   }
 
+  Future<WorkoutLog> updateWorkout(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/movement/workouts/$id',
+      data: body,
+    );
+    return WorkoutLog.fromJson(
+      Map<String, dynamic>.from(res.data?['workout'] ?? res.data ?? {}),
+    );
+  }
+
   Future<Map<String, dynamic>> suggestWorkoutAi() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/movement/suggest',

@@ -332,6 +332,43 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                             ),
                           ),
                           IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: 'Edit',
+                            onPressed: () async {
+                              final draft = await showFieldEditorSheet(
+                                context,
+                                title: 'Edit session',
+                                fields: {
+                                  'Title': s.title,
+                                  'Focus': s.focus ?? 'full_body',
+                                  'Minutes': '${s.durationMinutes ?? 45}',
+                                  'Notes': s.notes ?? '',
+                                },
+                              );
+                              if (draft == null || !mounted) return;
+                              try {
+                                final minutes = (int.tryParse(draft['Minutes'] ?? '') ?? s.durationMinutes ?? 45)
+                                    .clamp(5, 180)
+                                    .toInt();
+                                final updated = await ref.read(vivrantApiProvider).updateGymSession(s.id, {
+                                  'title': draft['Title'] ?? s.title,
+                                  'focus': draft['Focus'] ?? s.focus ?? 'full_body',
+                                  'duration_minutes': minutes,
+                                  'notes': draft['Notes'] ?? '',
+                                });
+                                if (!mounted) return;
+                                setState(() {
+                                  _items = [for (final item in _items) item.id == s.id ? updated : item];
+                                });
+                                ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymSessions, _items);
+                                context.showSuccess('Session updated');
+                              } catch (e) {
+                                if (!mounted) return;
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.delete_outline),
                             tooltip: 'Remove',
                             onPressed: () async {

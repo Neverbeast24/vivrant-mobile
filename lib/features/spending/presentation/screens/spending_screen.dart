@@ -242,6 +242,39 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
                             ),
                           ),
                           IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () async {
+                              final draft = await showFieldEditorSheet(
+                                context,
+                                title: 'Edit expense',
+                                fields: {
+                                  'Title': e.title,
+                                  'Category': e.category,
+                                  'Amount': e.amount.toStringAsFixed(0),
+                                  'Date': e.spentAt.toIso8601String().substring(0, 10),
+                                },
+                              );
+                              if (draft == null || !mounted) return;
+                              try {
+                                final updated = await ref.read(vivrantApiProvider).updateExpense(e.id, {
+                                  'title': draft['Title'] ?? e.title,
+                                  'category': draft['Category'] ?? e.category,
+                                  'amount': double.tryParse(draft['Amount'] ?? '') ?? e.amount,
+                                  'spent_at': draft['Date'] ?? e.spentAt.toIso8601String().substring(0, 10),
+                                });
+                                if (!mounted) return;
+                                setState(() {
+                                  _expenses = [for (final item in _expenses) item.id == e.id ? updated : item];
+                                });
+                                _cache();
+                                context.showSuccess('Expense updated');
+                              } catch (err) {
+                                if (!mounted) return;
+                                context.showError(apiErrorMessage(err));
+                              }
+                            },
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.delete_outline),
                             onPressed: () async {
                               final prev = List<Expense>.from(_expenses);

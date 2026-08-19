@@ -102,6 +102,10 @@ extension VivrantAiApi on VivrantApi {
     );
   }
 
+  Future<void> updateReminder(int id, Map<String, dynamic> body) async {
+    await _client.patch('/api/mobile/ai/reminders/$id', data: body);
+  }
+
   Future<void> deleteReminder(int id) async {
     await _client.delete('/api/mobile/ai/reminders/$id');
   }

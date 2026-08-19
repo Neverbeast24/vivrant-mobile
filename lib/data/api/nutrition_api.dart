@@ -26,6 +26,16 @@ extension VivrantNutritionApi on VivrantApi {
     await _client.delete('/api/mobile/nutrition/meals/$id');
   }
 
+  Future<NutritionLog> updateMeal(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/nutrition/meals/$id',
+      data: body,
+    );
+    return NutritionLog.fromJson(
+      Map<String, dynamic>.from(res.data?['meal'] ?? res.data ?? {}),
+    );
+  }
+
   Future<Map<String, dynamic>> estimateMealAi(
     String description, {
     String? photoPath,

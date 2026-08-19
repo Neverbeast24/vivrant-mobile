@@ -15,6 +15,7 @@ import '../../../../shared/providers/module_cache.dart';
 import '../../../../shared/providers/persistent_store.dart';
 import '../gym_labels.dart';
 import '../widgets/exercise_demo_sheet.dart';
+import '../widgets/saved_plan_editor_sheet.dart';
 
 class GymPlansScreen extends ConsumerStatefulWidget {
   const GymPlansScreen({super.key});
@@ -814,6 +815,27 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                         });
                       },
                       onShare: () => showShareExportSheet(context, gymPlanDoc(p)),
+                      onEdit: () async {
+                        final id = (p['id'] as num?)?.toInt();
+                        if (id == null) return;
+                        final draft = await SavedPlanEditorSheet.show(context, p);
+                        if (draft == null || !mounted) return;
+                        try {
+                          final updated = await ref.read(vivrantApiProvider).updateGymPlan(id, draft);
+                          if (!mounted) return;
+                          setState(() {
+                            _plans = [
+                              for (final item in _plans)
+                                if ((item['id'] as num?)?.toInt() == id) updated else item,
+                            ];
+                          });
+                          ref.read(moduleCacheProvider).write(ModuleCacheKeys.gymPlans, _plans);
+                          context.showSuccess('Program updated');
+                        } catch (e) {
+                          if (!mounted) return;
+                          context.showError(apiErrorMessage(e));
+                        }
+                      },
                       onDelete: () async {
                         final id = (p['id'] as num).toInt();
                         try {
@@ -1148,6 +1170,7 @@ class _PlanCard extends StatelessWidget {
     required this.expanded,
     required this.onToggleExpand,
     required this.onShare,
+    required this.onEdit,
     required this.onDelete,
   });
 
@@ -1156,6 +1179,7 @@ class _PlanCard extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggleExpand;
   final VoidCallback onShare;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   void _openSession(BuildContext context, {String? day}) {
@@ -1245,6 +1269,11 @@ class _PlanCard extends StatelessWidget {
                   tooltip: 'Share or export',
                   icon: const Icon(Icons.ios_share_rounded),
                   onPressed: onShare,
+                ),
+                IconButton(
+                  tooltip: 'Edit program',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: onEdit,
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline),

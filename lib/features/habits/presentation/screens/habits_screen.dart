@@ -348,6 +348,35 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               ),
                             ),
                             IconButton(
+                              tooltip: 'Edit habit',
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () async {
+                                final draft = await showFieldEditorSheet(
+                                  context,
+                                  title: 'Edit habit',
+                                  fields: {'Title': h.title},
+                                );
+                                if (draft == null || !mounted) return;
+                                try {
+                                  final updated = await ref.read(vivrantApiProvider).updateHabit(h.id, {
+                                    'title': draft['Title'] ?? h.title,
+                                  });
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _habits = [
+                                      for (final item in _habits)
+                                        item.id == h.id ? updated.copyWith(doneToday: h.doneToday) : item,
+                                    ];
+                                  });
+                                  ref.read(moduleCacheProvider).write(ModuleCacheKeys.habits, _habits);
+                                  context.showSuccess('Habit updated');
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  context.showError(apiErrorMessage(e));
+                                }
+                              },
+                            ),
+                            IconButton(
                               tooltip: 'Delete habit',
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () => _delete(h),

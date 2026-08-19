@@ -523,6 +523,49 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
                             ),
                           ),
                           IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () async {
+                              final draft = await showFieldEditorSheet(
+                                context,
+                                title: 'Edit item',
+                                fields: {
+                                  'Name': item.name,
+                                  'Quantity': item.quantity ?? '',
+                                  'Category': item.category,
+                                  'Price': item.estimatedPrice?.toStringAsFixed(0) ?? '',
+                                },
+                              );
+                              if (draft == null || !mounted) return;
+                              try {
+                                const cats = {
+                                  'produce',
+                                  'protein',
+                                  'dairy',
+                                  'grains',
+                                  'pantry',
+                                  'snacks',
+                                  'drinks',
+                                  'household',
+                                  'other',
+                                };
+                                final category = (draft['Category'] ?? item.category).toLowerCase();
+                                final updated = await ref.read(vivrantApiProvider).updateGrocery(item.id, {
+                                  'name': draft['Name'] ?? item.name,
+                                  'quantity': draft['Quantity'],
+                                  'category': cats.contains(category) ? category : item.category,
+                                  if ((draft['Price'] ?? '').isNotEmpty)
+                                    'estimated_price': double.tryParse(draft['Price']!),
+                                });
+                                if (!mounted) return;
+                                _setItems([for (final row in _items) row.id == item.id ? updated : row]);
+                                context.showSuccess('Item updated');
+                              } catch (e) {
+                                if (!mounted) return;
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.delete_outline),
                             onPressed: () => _delete(item),
                           ),

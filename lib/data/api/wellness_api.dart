@@ -61,6 +61,16 @@ extension VivrantWellnessApi on VivrantApi {
     await _client.delete('/api/mobile/journal/$id');
   }
 
+  Future<JournalEntry> updateJournal(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/journal/$id',
+      data: body,
+    );
+    return JournalEntry.fromJson(
+      Map<String, dynamic>.from(res.data?['entry'] ?? res.data ?? {}),
+    );
+  }
+
   Future<Map<String, dynamic>> reflectJournal() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/journal/reflect',
@@ -92,6 +102,16 @@ extension VivrantWellnessApi on VivrantApi {
 
   Future<void> deleteHabit(int id) async {
     await _client.delete('/api/mobile/habits/$id');
+  }
+
+  Future<Habit> updateHabit(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/habits/$id',
+      data: body,
+    );
+    return Habit.fromJson(
+      Map<String, dynamic>.from(res.data?['habit'] ?? res.data ?? {}),
+    );
   }
 
   /// BMI-aware habit suggestions.

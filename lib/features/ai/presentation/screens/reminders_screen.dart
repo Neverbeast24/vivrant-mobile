@@ -331,6 +331,48 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                             },
                           ),
                           IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () async {
+                              final draft = await showFieldEditorSheet(
+                                context,
+                                title: 'Edit reminder',
+                                fields: {
+                                  'Title': r['title']?.toString() ?? '',
+                                  'Message': r['body']?.toString() ?? '',
+                                  'Time': () {
+                                    final time = r['schedule_time']?.toString() ?? '09:00';
+                                    return time.length >= 5 ? time.substring(0, 5) : (time.isEmpty ? '09:00' : time);
+                                  }(),
+                                },
+                              );
+                              if (draft == null || !mounted) return;
+                              try {
+                                await ref.read(vivrantApiProvider).updateReminder(id, {
+                                  'title': draft['Title'],
+                                  'body': draft['Message'],
+                                  'schedule_time': draft['Time'],
+                                });
+                                if (!mounted) return;
+                                _setItems([
+                                  for (final item in _items)
+                                    if ((item['id'] as num).toInt() == id)
+                                      {
+                                        ...item,
+                                        'title': draft['Title'],
+                                        'body': draft['Message'],
+                                        'schedule_time': draft['Time'],
+                                      }
+                                    else
+                                      item,
+                                ]);
+                                context.showSuccess('Reminder updated');
+                              } catch (e) {
+                                if (!mounted) return;
+                                context.showError(apiErrorMessage(e));
+                              }
+                            },
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.delete_outline),
                             onPressed: () async {
                               final prev =

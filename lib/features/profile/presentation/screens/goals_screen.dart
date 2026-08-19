@@ -471,6 +471,34 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                               onSelected: (v) async {
                                 final prev = List<HealthGoal>.from(_goals);
                                 try {
+                                  if (v == 'edit') {
+                                    final draft = await showFieldEditorSheet(
+                                      context,
+                                      title: 'Edit goal',
+                                      fields: {
+                                        'Title': g.title,
+                                        'Category': g.category,
+                                        'Target': '${g.targetValue ?? ''}',
+                                        'Unit': g.unit ?? '',
+                                        'Date': g.targetDate ?? '',
+                                      },
+                                    );
+                                    if (draft == null || !mounted) return;
+                                    final updated = await ref.read(vivrantApiProvider).updateGoal(g.id, {
+                                      'title': draft['Title'] ?? g.title,
+                                      'category': draft['Category'] ?? g.category,
+                                      if ((draft['Target'] ?? '').isNotEmpty)
+                                        'target_value': double.tryParse(draft['Target']!),
+                                      'unit': draft['Unit'],
+                                      if ((draft['Date'] ?? '').isNotEmpty) 'target_date': draft['Date'],
+                                    });
+                                    if (!mounted) return;
+                                    _setGoals([
+                                      for (final item in _goals) item.id == g.id ? updated : item,
+                                    ]);
+                                    context.showSuccess('Goal updated');
+                                    return;
+                                  }
                                   if (v == 'delete') {
                                     _setGoals(
                                       _goals.where((x) => x.id != g.id).toList(),
@@ -507,6 +535,10 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                                 }
                               },
                               itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Edit'),
+                                ),
                                 PopupMenuItem(
                                   value: 'active',
                                   child: Text('Mark active'),

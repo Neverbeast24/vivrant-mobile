@@ -69,6 +69,16 @@ extension VivrantProfileApi on VivrantApi {
     await _client.patch('/api/mobile/goals/$id', data: {'status': status});
   }
 
+  Future<HealthGoal> updateGoal(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/goals/$id',
+      data: body,
+    );
+    return HealthGoal.fromJson(
+      Map<String, dynamic>.from(res.data?['goal'] ?? res.data ?? {}),
+    );
+  }
+
   Future<void> deleteGoal(int id) async {
     await _client.delete('/api/mobile/goals/$id');
   }

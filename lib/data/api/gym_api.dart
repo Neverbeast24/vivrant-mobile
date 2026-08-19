@@ -123,6 +123,24 @@ extension VivrantGymApi on VivrantApi {
     await _client.delete('/api/mobile/gym/plans/$id');
   }
 
+  Future<Map<String, dynamic>> updateGymPlan(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/gym/plans/$id',
+      data: body,
+    );
+    return Map<String, dynamic>.from(res.data?['plan'] ?? res.data ?? {});
+  }
+
+  Future<GymSession> updateGymSession(int id, Map<String, dynamic> body) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      '/api/mobile/gym/sessions/$id',
+      data: body,
+    );
+    return GymSession.fromJson(
+      Map<String, dynamic>.from(res.data?['session'] ?? res.data ?? {}),
+    );
+  }
+
   Future<Map<String, dynamic>> recommendMachinesAi() async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/gym/machines/recommend',

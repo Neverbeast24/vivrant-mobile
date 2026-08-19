@@ -9,10 +9,12 @@ class MealListTile extends StatelessWidget {
     super.key,
     required this.meal,
     this.onDelete,
+    this.onEdit,
   });
 
   final NutritionLog meal;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +23,15 @@ class MealListTile extends StatelessWidget {
       title: meal.mealName,
       subtitle:
           '${meal.mealType} · ${meal.calories?.toStringAsFixed(0) ?? '—'} kcal',
-      trailing: onDelete == null
-          ? null
-          : IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: onDelete,
-            ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onEdit != null)
+            IconButton(icon: const Icon(Icons.edit_outlined), onPressed: onEdit),
+          if (onDelete != null)
+            IconButton(icon: const Icon(Icons.delete_outline), onPressed: onDelete),
+        ],
+      ),
     );
   }
 }

@@ -249,6 +249,46 @@ class _NutritionScreenState extends ConsumerState<NutritionScreen> {
                       children: [
                         MealListTile(
                           meal: m,
+                          onEdit: () async {
+                            final draft = await showFieldEditorSheet(
+                              context,
+                              title: 'Edit meal',
+                              fields: {
+                                'Name': m.mealName,
+                                'Type': m.mealType,
+                                'Calories': '${m.calories?.toStringAsFixed(0) ?? ''}',
+                                'Protein': '${m.proteinG ?? ''}',
+                                'Carbs': '${m.carbsG ?? ''}',
+                                'Fat': '${m.fatG ?? ''}',
+                              },
+                            );
+                            if (draft == null || !mounted) return;
+                            try {
+                              const mealTypes = {'breakfast', 'lunch', 'dinner', 'snack'};
+                              final mealType = (draft['Type'] ?? m.mealType).toLowerCase();
+                              final updated = await ref.read(vivrantApiProvider).updateMeal(m.id, {
+                                'meal_name': draft['Name'] ?? m.mealName,
+                                'meal_type': mealTypes.contains(mealType) ? mealType : m.mealType,
+                                if ((draft['Calories'] ?? '').isNotEmpty)
+                                  'calories': int.tryParse(draft['Calories']!),
+                                if ((draft['Protein'] ?? '').isNotEmpty)
+                                  'protein_g': double.tryParse(draft['Protein']!),
+                                if ((draft['Carbs'] ?? '').isNotEmpty)
+                                  'carbs_g': double.tryParse(draft['Carbs']!),
+                                if ((draft['Fat'] ?? '').isNotEmpty)
+                                  'fat_g': double.tryParse(draft['Fat']!),
+                              });
+                              if (!mounted) return;
+                              setState(() {
+                                _meals = [for (final item in _meals) item.id == m.id ? updated : item];
+                              });
+                              ref.read(moduleCacheProvider).write(ModuleCacheKeys.nutrition, _meals);
+                              context.showSuccess('Meal updated');
+                            } catch (e) {
+                              if (!mounted) return;
+                              context.showError(apiErrorMessage(e));
+                            }
+                          },
                           onDelete: () async {
                             try {
                               await ref
