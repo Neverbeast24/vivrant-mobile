@@ -175,6 +175,23 @@ void main() {
     });
   });
 
+  group('mergePlanDaysIntoDraft', () {
+    test('fills empty weekdays from a saved program', () {
+      final draft = {
+        'training_days': [1, 3, 5],
+        'kept_days': {
+          '1': {'day': 'Monday · Pull', 'focus': 'pull', 'exercises': <Map<String, dynamic>>[]},
+        },
+      };
+      final next = mergePlanDaysIntoDraft(draft, [
+        {'day': 'Monday · Push', 'focus': 'push', 'exercises': <Map<String, dynamic>>[]},
+        {'day': 'Wednesday · Legs', 'focus': 'legs', 'exercises': <Map<String, dynamic>>[]},
+      ]);
+      expect((next['kept_days'] as Map)['1']['focus'], 'pull');
+      expect((next['kept_days'] as Map)['3']['focus'], 'legs');
+    });
+  });
+
   group('moveKeptDayOnDraft', () {
     test('swaps kept workouts between weekdays', () {
       final draft = {

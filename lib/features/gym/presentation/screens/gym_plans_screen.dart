@@ -304,6 +304,33 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
     }
   }
 
+  Future<void> _mergeIntoDraft(Map<String, dynamic> plan) async {
+    final days = [
+      for (final raw in (plan['days'] as List? ?? const []))
+        if (raw is Map) Map<String, dynamic>.from(raw),
+    ];
+    if (days.isEmpty) return;
+    final current = _draft;
+    final updated = current == null
+        ? draftFromSavedPlan(plan, trainingDays: _trainingDays)
+        : mergePlanDaysIntoDraft(current, days);
+    setState(() {
+      _draft = updated;
+      _trainingDays = sanitizeTrainingDays(
+        (updated['training_days'] as List? ?? _trainingDays).map((item) => (item as num).toInt()),
+      );
+    });
+    try {
+      final saved = await ref.read(vivrantApiProvider).saveGymProgramDraft(updated);
+      await _persistDraft(saved.isNotEmpty ? saved : updated);
+      if (!mounted) return;
+      context.showSuccess('Added ${plan['title'] ?? 'program'} days to this week');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
   Future<void> _customizeDraft() async {
     final current = _draft;
     if (current == null) return;
@@ -924,6 +951,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                           }
                         });
                       },
+                      onUseInDraft: () => _mergeIntoDraft(p),
                       onShare: () => showShareExportSheet(context, gymPlanDoc(p)),
                       onEdit: () async {
                         final id = (p['id'] as num?)?.toInt();
@@ -1380,6 +1408,7 @@ class _PlanCard extends StatelessWidget {
     required this.onShare,
     required this.onEdit,
     required this.onDelete,
+    required this.onUseInDraft,
   });
 
   final Map<String, dynamic> plan;
@@ -1389,6 +1418,7 @@ class _PlanCard extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onUseInDraft;
 
   void _openSession(BuildContext context, {String? day}) {
     final planId = (plan['id'] as num?)?.toInt();
@@ -1496,6 +1526,15 @@ class _PlanCard extends StatelessWidget {
                 onPressed: () => _openSession(context, day: today?['day']?.toString()),
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: Text(today == null ? 'Start a saved day' : "Start today's workout"),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: onUseInDraft,
+                icon: const Icon(Icons.merge_type_rounded),
+                label: const Text('Add days to this week'),
               ),
             ),
             if (days.isNotEmpty) ...[

@@ -962,6 +962,86 @@ Map<String, dynamic> moveKeptDayOnDraft(
   return {...draft, 'kept_days': kept};
 }
 
+Map<String, dynamic> _clonePlanDay(Map<String, dynamic> day) {
+  return Map<String, dynamic>.from(day);
+}
+
+/// Start a draft week from a saved program.
+Map<String, dynamic> draftFromSavedPlan(
+  Map<String, dynamic> plan, {
+  List<int>? trainingDays,
+}) {
+  final days = [
+    for (final raw in (plan['days'] as List? ?? const []))
+      if (raw is Map) Map<String, dynamic>.from(raw),
+  ];
+  final labeled = [
+    for (final day in days)
+      if (weekdayIsoFromLabel(day['day']?.toString() ?? '') != null)
+        weekdayIsoFromLabel(day['day']!.toString())!,
+  ];
+  final schedule = sanitizeTrainingDays(
+    (plan['training_days'] as List?)?.map((item) => (item as num).toInt()) ?? labeled,
+    fallbackCount: days.isEmpty ? 3 : days.length,
+  );
+  final kept = <String, dynamic>{};
+  for (var i = 0; i < days.length; i++) {
+    final iso = weekdayIsoFromLabel(days[i]['day']?.toString() ?? '') ??
+        (i < schedule.length ? schedule[i] : null);
+    if (iso == null) continue;
+    kept['$iso'] = stampDayWeekday(_clonePlanDay(days[i]), iso);
+  }
+  return {
+    ...plan,
+    'preview_days': <Map<String, dynamic>>[],
+    'kept_days': kept,
+    'training_days': trainingDays?.isNotEmpty == true ? trainingDays : schedule,
+  };
+}
+
+/// Copy saved-program days onto a draft. `fill` skips occupied weekdays.
+Map<String, dynamic> mergePlanDaysIntoDraft(
+  Map<String, dynamic> draft,
+  List<Map<String, dynamic>> days, {
+  bool overwrite = false,
+}) {
+  final next = Map<String, dynamic>.from(keptDaysMap(draft));
+  var training = [
+    for (final raw in (draft['training_days'] as List? ?? const []))
+      if (raw is num) raw.toInt(),
+  ];
+  if (training.isEmpty) training = sanitizeTrainingDays(const []);
+
+  int? firstEmpty() {
+    for (final slot in training) {
+      if (next['$slot'] == null) return slot;
+    }
+    return null;
+  }
+
+  for (final raw in days) {
+    final day = Map<String, dynamic>.from(raw);
+    var iso = weekdayIsoFromLabel(day['day']?.toString() ?? '') ?? firstEmpty();
+    if (iso == null) continue;
+    if (!training.contains(iso)) {
+      if (training.length >= 6) {
+        iso = firstEmpty();
+        if (iso == null) continue;
+      } else {
+        training = [...training, iso]..sort();
+      }
+    }
+    if (!overwrite && next['$iso'] != null) continue;
+    next['$iso'] = stampDayWeekday(day, iso);
+  }
+
+  return {
+    ...draft,
+    'kept_days': next,
+    'training_days': training,
+  };
+}
+
 /// Reorder moves inside a generated preview day.
 Map<String, dynamic> reorderPreviewExercisesOnDraft(
   Map<String, dynamic> draft,
