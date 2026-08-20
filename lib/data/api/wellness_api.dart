@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Sleep, hydration, mindfulness, journal, and habits.
 extension VivrantWellnessApi on VivrantApi {
   Future<void> logSleep(Map<String, dynamic> body) async {
     await _client.post('/api/mobile/sleep', data: body);

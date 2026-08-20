@@ -1,8 +1,13 @@
-export 'presentation/screens/admin_overview_screen.dart';
-export 'presentation/screens/admin_users_screen.dart';
-export 'presentation/screens/admin_tickets_screen.dart';
-export 'presentation/screens/admin_roles_screen.dart';
-export 'presentation/screens/admin_audit_screen.dart';
-export 'presentation/screens/admin_settings_screen.dart';
+/// Staff console — overview, users, tickets, roles, audit, and system tools.
+///
+/// Routes are gated in `lib/app/router.dart` by profile role.
+library;
+
 export 'presentation/screens/admin_activity_screen.dart';
+export 'presentation/screens/admin_audit_screen.dart';
 export 'presentation/screens/admin_inquiries_screen.dart';
+export 'presentation/screens/admin_overview_screen.dart';
+export 'presentation/screens/admin_roles_screen.dart';
+export 'presentation/screens/admin_settings_screen.dart';
+export 'presentation/screens/admin_tickets_screen.dart';
+export 'presentation/screens/admin_users_screen.dart';

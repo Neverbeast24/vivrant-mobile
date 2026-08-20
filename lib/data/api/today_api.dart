@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Today home payload (check-in, stats, leftovers).
 extension VivrantTodayApi on VivrantApi {
   Future<Map<String, dynamic>> getToday() async {
     final res = await _client.get<Map<String, dynamic>>('/api/mobile/today');

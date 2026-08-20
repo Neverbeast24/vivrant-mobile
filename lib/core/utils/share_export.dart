@@ -1,7 +1,12 @@
 import 'dart:convert';
 
 import '../../shared/models/models.dart';
-import '../../features/gym/presentation/gym_labels.dart';
+import '../../features/gym/data/gym_labels.dart';
+
+/// Builds shareable text / CSV / JSON documents for lists and gym programs.
+///
+/// Gym-specific formatters import `gym_labels.dart` because they need the same
+/// muscle / equipment vocabulary as the gym UI. Generic CSV helpers stay here.
 
 class ShareExportDoc {
   const ShareExportDoc({
@@ -358,6 +363,60 @@ ShareExportDoc groceryListDoc(List<GroceryItem> items) {
           )
           .toList(),
     ),
+  );
+}
+
+ShareExportDoc groceryPlanDoc(Map<String, dynamic> plan) {
+  final title = plan['title']?.toString().trim().isNotEmpty == true
+      ? plan['title'].toString()
+      : 'Grocery plan';
+  final summary = plan['summary']?.toString() ?? '';
+  final budgetNote = plan['budget_note']?.toString() ?? '';
+  final estimatedTotal = plan['estimated_total'];
+  final meals = (plan['meals'] as List? ?? const [])
+      .map((e) => e.toString().trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+  final items = (plan['items'] as List? ?? const [])
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+  final totalText = estimatedTotal == null
+      ? ''
+      : 'Estimated total: ₱${(estimatedTotal is num) ? estimatedTotal.round() : estimatedTotal}';
+  final lines = [
+    summary,
+    if (budgetNote.isNotEmpty) 'Budget: $budgetNote',
+    if (totalText.isNotEmpty) totalText,
+    '',
+    if (meals.isNotEmpty) ...['Meals', ...meals.map((meal) => '• $meal'), ''],
+    'Items',
+    ...items.map((item) {
+      final qty = item['quantity']?.toString().trim();
+      final qtyText = qty != null && qty.isNotEmpty ? ' ($qty)' : '';
+      final price = item['estimated_price'];
+      final priceText = price == null
+          ? ''
+          : ' · ₱${price is num ? price.round() : price}';
+      return '• ${item['name'] ?? 'Item'}$qtyText$priceText';
+    }),
+  ];
+  return ShareExportDoc(
+    title: title,
+    filename: filenameSlug(title),
+    text: _heading(title, lines),
+    csv: toCsv([
+      ['Name', 'Quantity', 'Category', 'Estimated price'],
+      ...items.map(
+        (item) => [
+          item['name'] ?? '',
+          item['quantity'] ?? '',
+          item['category'] ?? '',
+          item['estimated_price'] ?? '',
+        ],
+      ),
+    ]),
+    json: _jsonEncode(plan),
   );
 }
 

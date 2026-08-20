@@ -1,4 +1,5 @@
 /// Shared form option lists used by log / add screens.
+library;
 
 const List<String> mealTypes = [
   'breakfast',
@@ -17,22 +18,35 @@ const List<String> activityTypes = [
 ];
 
 const List<String> expenseCategories = [
-  'groceries',
-  'supplements',
+  'food',
   'fitness',
-  'medical',
+  'supplements',
+  'wellness',
   'other',
 ];
 
 const List<String> pantryCategories = [
-  'produce',
-  'dairy',
+  'vegetables',
+  'fruits',
   'protein',
+  'dairy',
   'grains',
+  'snacks',
+  'drinks',
+  'condiments',
+  'frozen',
   'other',
 ];
 
 String labelForOption(String value) {
   if (value.isEmpty) return value;
   return '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
+String normalizeExpenseCategory(String raw) {
+  final value = raw.trim().toLowerCase();
+  if (expenseCategories.contains(value)) return value;
+  if (value == 'groceries' || value == 'grocery') return 'food';
+  if (value == 'medical' || value == 'health') return 'wellness';
+  return 'other';
 }

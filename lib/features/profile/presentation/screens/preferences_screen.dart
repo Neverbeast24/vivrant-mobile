@@ -150,7 +150,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen>
         child: SlideTransition(
           position: _slide,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+            padding: VivrantLayout.pagePadding,
             children: [
               const PageHeader(
                 eyebrow: 'Settings',

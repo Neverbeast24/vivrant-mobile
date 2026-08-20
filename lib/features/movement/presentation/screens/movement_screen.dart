@@ -11,7 +11,6 @@ import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
 import '../../../../shared/providers/shell_tab_provider.dart';
-import '../../../gym/presentation/widgets/program_session_panel.dart';
 
 class MovementScreen extends ConsumerStatefulWidget {
   const MovementScreen({super.key});
@@ -25,7 +24,6 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
 
   final _query = TextEditingController();
   List<WorkoutLog> _items = [];
-  List<Map<String, dynamic>> _plans = const [];
   bool _loading = false;
   bool _activated = false;
   String? _error;
@@ -75,17 +73,11 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
     });
     try {
       final api = ref.read(vivrantApiProvider);
-      final results = await Future.wait([
-        api.listWorkouts(),
-        api.gymPlans(),
-      ]);
+      final items = await api.listWorkouts();
       if (!mounted) return;
-      final items = results[0] as List<WorkoutLog>;
-      final plans = results[1] as List<Map<String, dynamic>>;
       ref.read(moduleCacheProvider).write(ModuleCacheKeys.movement, items);
       setState(() {
         _items = items;
-        _plans = plans;
         _loading = false;
       });
     } catch (e) {
@@ -130,7 +122,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: VivrantLayout.pagePadding,
           children: [
             PageHeader(
               eyebrow: 'Training',
@@ -153,10 +145,6 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                 ],
               ),
             ),
-            if (_plans.isNotEmpty) ...[
-              ProgramSessionPanel(plans: _plans, onLogged: _load),
-              const SizedBox(height: 12),
-            ],
             StatCard(
               label: 'Today',
               value: '$minutes min',
@@ -276,6 +264,7 @@ class _MovementScreenState extends ConsumerState<MovementScreen> {
                           IconButton(
                             icon: const Icon(Icons.delete_outline),
                             onPressed: () async {
+                              if (!(await confirmDelete(context, label: w.title))) return;
                               try {
                                 await ref
                                     .read(vivrantApiProvider)

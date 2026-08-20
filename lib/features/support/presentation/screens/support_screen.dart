@@ -89,7 +89,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
       child: RefreshIndicator(
         onRefresh: _loadTickets,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Help',

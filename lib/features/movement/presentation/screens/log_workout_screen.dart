@@ -82,7 +82,7 @@ class _LogWorkoutScreenState extends ConsumerState<LogWorkoutScreen> {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Log workout')),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           ProgramSessionPanel(
             plans: _plans,

@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Gym catalog, sessions, and AI training programs.
 extension VivrantGymApi on VivrantApi {
   Future<Map<String, dynamic>> gymOverview() async {
     final res = await _client.get<Map<String, dynamic>>('/api/mobile/gym');

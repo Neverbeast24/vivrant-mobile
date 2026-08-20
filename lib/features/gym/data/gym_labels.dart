@@ -1,3 +1,9 @@
+/// Gym catalog constants, muscle filters, and equipment labels.
+///
+/// Mirrors viva-server gym helpers. Keep this file UI-free so screens,
+/// export formatters, and plan editors can share the same vocabulary.
+library;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/utils/humanize.dart';
@@ -999,15 +1005,16 @@ String todaySessionDate([DateTime? date]) {
   return '${now.year}-$m-$d';
 }
 
-Color difficultyColor(String difficulty) {
+Color difficultyColor(String difficulty, {Brightness brightness = Brightness.light}) {
+  final dark = brightness == Brightness.dark;
   switch (difficulty.toLowerCase()) {
     case 'beginner':
-      return const Color(0xFF0E7C66);
+      return Color(dark ? 0xFF3DB896 : 0xFF0E7C66);
     case 'intermediate':
-      return const Color(0xFFB45309);
+      return Color(dark ? 0xFFFDB022 : 0xFFB45309);
     case 'advanced':
-      return const Color(0xFFB42318);
+      return Color(dark ? 0xFFF97066 : 0xFFB42318);
     default:
-      return const Color(0xFF4A5C54);
+      return Color(dark ? 0xFFC5D4CB : 0xFF4A5C54);
   }
 }

@@ -46,7 +46,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Monthly budget')),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           const PageHeader(
             eyebrow: 'Budget',

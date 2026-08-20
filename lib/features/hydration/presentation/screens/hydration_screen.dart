@@ -78,7 +78,7 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Hydration')),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           const PageHeader(
             eyebrow: 'Water',
@@ -87,7 +87,7 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
           ),
           if (_today.isNotEmpty) ...[
             WellnessPulseBar(today: _today, current: 'hydration'),
-            const SizedBox(height: 16),
+            const SectionGap(),
           ],
           if (_loading)
             const Padding(
@@ -107,18 +107,24 @@ class _HydrationScreenState extends ConsumerState<HydrationScreen> {
             VivrantPanel(
               title: 'Quick add',
               child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 12,
+                runSpacing: 12,
                 children: [
                   for (final ml in [150, 250, 350, 500])
                     ActionChip(
-                      label: Text('$ml ml'),
+                      label: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
+                        child: Text('$ml ml'),
+                      ),
                       onPressed: _busy ? null : () => _add(ml),
                     ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SectionGap(),
             OutlinedButton.icon(
               onPressed: _schedule,
               icon: const Icon(Icons.notifications_active_outlined),

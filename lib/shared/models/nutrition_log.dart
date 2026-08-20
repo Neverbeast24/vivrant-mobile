@@ -30,4 +30,25 @@ class NutritionLog {
         loggedAt: DateTime.tryParse(json['logged_at'] as String? ?? '') ??
             DateTime.now(),
       );
+
+  NutritionLog copyWith({
+    int? id,
+    String? mealName,
+    String? mealType,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+    DateTime? loggedAt,
+  }) =>
+      NutritionLog(
+        id: id ?? this.id,
+        mealName: mealName ?? this.mealName,
+        mealType: mealType ?? this.mealType,
+        calories: calories ?? this.calories,
+        proteinG: proteinG ?? this.proteinG,
+        carbsG: carbsG ?? this.carbsG,
+        fatG: fatG ?? this.fatG,
+        loggedAt: loggedAt ?? this.loggedAt,
+      );
 }

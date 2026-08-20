@@ -8,7 +8,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 import '../widgets/program_session_panel.dart';
 
 class GymSessionsScreen extends ConsumerStatefulWidget {
@@ -234,7 +234,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Gym',
@@ -372,6 +372,7 @@ class _GymSessionsScreenState extends ConsumerState<GymSessionsScreen> {
                             icon: const Icon(Icons.delete_outline),
                             tooltip: 'Remove',
                             onPressed: () async {
+                              if (!(await confirmDelete(context, label: s.title))) return;
                               try {
                                 await ref
                                     .read(vivrantApiProvider)

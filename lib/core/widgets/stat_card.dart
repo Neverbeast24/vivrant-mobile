@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../theme/vivrant_colors.dart';
+import '../theme/vivrant_motion.dart';
+import 'icon_well.dart';
 
 class StatCard extends StatelessWidget {
   const StatCard({
@@ -19,8 +21,12 @@ class StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VivrantColors.of(context);
+    final parsed = RegExp(r'^(\d+)(.*)$').firstMatch(value.trim());
+    final number = parsed == null ? null : int.tryParse(parsed.group(1)!);
+    final suffix = parsed?.group(2) ?? '';
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(22),
@@ -39,8 +45,8 @@ class StatCard extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 18, color: c.accent),
-                const SizedBox(width: 8),
+                IconWell(icon: icon!, size: 36, iconSize: 18),
+                const SizedBox(width: 10),
               ],
               Expanded(
                 child: Text(
@@ -50,16 +56,32 @@ class StatCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: c.ink,
-                ),
-          ),
+          const SizedBox(height: 14),
+          if (number != null && !VivrantMotion.reduce(context))
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: number.toDouble()),
+              duration: const Duration(milliseconds: 720),
+              curve: VivrantMotion.emphasized,
+              builder: (context, animated, _) {
+                return Text(
+                  '${animated.round()}$suffix',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: c.ink,
+                      ),
+                );
+              },
+            )
+          else
+            Text(
+              value,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: c.ink,
+                  ),
+            ),
           if (caption != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(caption!, style: Theme.of(context).textTheme.bodySmall),
           ],
         ],

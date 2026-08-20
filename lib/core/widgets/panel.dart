@@ -8,7 +8,7 @@ class VivrantPanel extends StatelessWidget {
     this.title,
     this.trailing,
     required this.child,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(22),
   });
 
   final String? title;
@@ -26,6 +26,13 @@ class VivrantPanel extends StatelessWidget {
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: c.ink.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: c.accent.withValues(alpha: c.dark ? 0.10 : 0.05),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -33,6 +40,21 @@ class VivrantPanel extends StatelessWidget {
           if (title != null) ...[
             Row(
               children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: c.accent,
+                    boxShadow: [
+                      BoxShadow(
+                        color: c.accent.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     title!,
@@ -44,7 +66,7 @@ class VivrantPanel extends StatelessWidget {
                 if (trailing != null) trailing!,
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
           ],
           child,
         ],

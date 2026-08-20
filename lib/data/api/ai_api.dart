@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Chat, insights, reminders, and weekly reports.
 extension VivrantAiApi on VivrantApi {
   Future<Map<String, dynamic>> reports() async {
     final res =

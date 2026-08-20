@@ -139,7 +139,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
                     ? Padding(
-                        padding: const EdgeInsets.all(20),
+                        padding: VivrantLayout.pagePadding,
                         child: EmptyState(
                           message: _error!,
                           action: OutlinedButton(

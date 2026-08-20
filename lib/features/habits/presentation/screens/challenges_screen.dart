@@ -142,6 +142,8 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
   }
 
   Future<void> _delete(int id) async {
+    final ok = await confirmDelete(context, label: 'this challenge');
+    if (!ok || !mounted) return;
     final prev = _items.map((e) => Map<String, dynamic>.from(e)).toList();
     _setItems(
       _items.where((item) => (item['id'] as num?)?.toInt() != id).toList(),
@@ -208,7 +210,7 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Habits',

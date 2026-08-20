@@ -227,7 +227,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Ask for help',
@@ -410,6 +410,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                           IconButton(
                             icon: const Icon(Icons.delete_outline),
                             onPressed: () async {
+                              if (!(await confirmDelete(context, label: 'this reminder'))) return;
                               final prev =
                                   _items.map((e) => Map<String, dynamic>.from(e)).toList();
                               _setItems(

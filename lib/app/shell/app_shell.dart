@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/widgets/widgets.dart';
 import '../../shared/providers/shell_tab_provider.dart';
 
+/// Bottom-nav shell: Today · Nutrition · Training · Ask · More.
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -60,8 +61,6 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void didUpdateWidget(covariant AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Defer — writing providers during the route rebuild (e.g. right after
-    // login) can throw and abort auth via StateNotifierListenerError.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _syncTabIndex(widget.navigationShell.currentIndex);
     });
@@ -75,28 +74,56 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
+  void _onDragSettled(int index) {
+    _syncTabIndex(index);
+    widget.navigationShell.goBranch(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final index = widget.navigationShell.currentIndex;
     final media = MediaQuery.of(context);
     final clearance = FloatingGlassNavBar.clearanceFor(context);
+    final position = ref.read(shellTabPositionProvider);
 
     return GradientScaffold(
       extendBody: true,
       bottomNavigationBar: FloatingGlassNavBar(
         selectedIndex: index,
+        positionListenable: position,
         onDestinationSelected: _onTap,
+        onDragSettled: _onDragSettled,
         destinations: _destinations,
       ),
       child: MediaQuery(
         data: media.copyWith(
           padding: media.padding.copyWith(bottom: clearance),
         ),
-        child: TabSwitchTransition(
-          index: index,
-          child: widget.navigationShell,
-        ),
+        child: widget.navigationShell,
       ),
+    );
+  }
+}
+
+/// Keeps go_router branch navigators in a swipeable page view that shares
+/// position with the footer pill.
+class ShellSwipeContainer extends ConsumerWidget {
+  const ShellSwipeContainer({
+    super.key,
+    required this.navigationShell,
+    required this.children,
+  });
+
+  final StatefulNavigationShell navigationShell;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return VivrantSlidingIndexedStack(
+      index: navigationShell.currentIndex,
+      onIndexChanged: (index) => navigationShell.goBranch(index),
+      positionNotifier: ref.read(shellTabPositionProvider),
+      children: children,
     );
   }
 }

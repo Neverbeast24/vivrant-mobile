@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vivrant_mobile/features/gym/presentation/gym_labels.dart';
+import 'package:vivrant_mobile/features/gym/data/gym_labels.dart';
 
 void main() {
   group('pickTodaysPlanDay', () {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../gym_labels.dart';
+import '../../../../core/widgets/widgets.dart';
+import '../../data/gym_labels.dart';
 
 class SavedPlanEditorSheet extends StatefulWidget {
   const SavedPlanEditorSheet({super.key, required this.plan});
@@ -148,7 +149,17 @@ class _SavedPlanEditorSheetState extends State<SavedPlanEditorSheet> {
                                           ),
                                         ),
                                         IconButton(
-                                          onPressed: () => setState(() => day.exercises.removeAt(i)),
+                                          onPressed: () async {
+                                            if (!(await confirmDelete(
+                                              context,
+                                              label: day.exercises[i].name.text.trim().isEmpty
+                                                  ? 'this move'
+                                                  : day.exercises[i].name.text.trim(),
+                                            ))) {
+                                              return;
+                                            }
+                                            setState(() => day.exercises.removeAt(i));
+                                          },
                                           icon: const Icon(Icons.delete_outline),
                                         ),
                                       ],

@@ -6,7 +6,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
 import '../../../../shared/providers/module_cache.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 import '../widgets/exercise_demo_card.dart';
 import '../widgets/exercise_demo_sheet.dart';
 import '../widgets/todays_program_moves.dart';
@@ -125,7 +125,7 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
               )
             : _error != null
                 ? ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: VivrantLayout.pagePadding,
                     children: [
                       EmptyState(
                         message: _error!,
@@ -137,7 +137,7 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
                     ],
                   )
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                    padding: VivrantLayout.pagePadding,
                     children: [
                       const PageHeader(
                         eyebrow: 'Library',
@@ -151,7 +151,7 @@ class _GymDemosScreenState extends ConsumerState<GymDemosScreen> {
                         onSelect: (exercise) =>
                             showExerciseDemoSheet(context, exercise),
                       ),
-                      const SizedBox(height: 14),
+                      const SectionGap(),
                       VivrantSearchField(
                         controller: _query,
                         hintText: 'Search exercises…',

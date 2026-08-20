@@ -12,9 +12,18 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VivrantColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10, top: 4),
+      padding: const EdgeInsets.only(bottom: 14, top: 8),
       child: Row(
         children: [
+          Container(
+            width: 18,
+            height: 2,
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(99),
+              gradient: c.brandGradient,
+            ),
+          ),
           Expanded(
             child: Text(
               text.toUpperCase(),

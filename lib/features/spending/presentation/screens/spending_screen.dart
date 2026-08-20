@@ -5,13 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/ai_text.dart';
 import '../../../../core/utils/context_extensions.dart';
-import '../../../../core/utils/humanize.dart';
-import '../../../../core/utils/share_export.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/module_cache.dart';
 
+/// Spending hub — destinations only. The expense list is on history.
 class SpendingScreen extends ConsumerStatefulWidget {
   const SpendingScreen({super.key});
 
@@ -20,12 +19,10 @@ class SpendingScreen extends ConsumerStatefulWidget {
 }
 
 class _SpendingScreenState extends ConsumerState<SpendingScreen> {
-  final _query = TextEditingController();
   Map<String, dynamic>? _overview;
   List<Expense> _expenses = [];
   bool _loading = true;
   String? _error;
-  String _filter = 'all';
 
   @override
   void initState() {
@@ -44,21 +41,9 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _query.dispose();
-    super.dispose();
-  }
-
-  void _cache() {
-    ref.read(moduleCacheProvider).write(ModuleCacheKeys.spending, {
-      'overview': _overview,
-      'expenses': _expenses,
-    });
-  }
-
   Future<void> _load() async {
-    final showSpinner = ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.spending);
+    final showSpinner =
+        ref.read(moduleCacheProvider).shouldShowSpinner(ModuleCacheKeys.spending);
     setState(() {
       if (showSpinner) _loading = true;
       _error = null;
@@ -90,87 +75,25 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
     }
   }
 
-  List<String> get _categories {
-    final cats = _expenses.map((e) => e.category).where((c) => c.isNotEmpty).toSet().toList()
-      ..sort();
-    return cats;
-  }
-
-  List<Expense> get _filtered {
-    final q = _query.text.trim().toLowerCase();
-    return _expenses.where((e) {
-      if (_filter != 'all' && e.category != _filter) return false;
-      if (q.isEmpty) return true;
-      return e.title.toLowerCase().contains(q) ||
-          e.category.toLowerCase().contains(q);
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final spent = (_overview?['spent'] as num?)?.toDouble() ??
         _expenses.fold<double>(0, (s, e) => s + e.amount);
     final budget = (_overview?['budget'] as num?)?.toDouble();
-    final filtered = _filtered;
+
     return GradientScaffold(
-      appBar: AppBar(
-        title: const Text('Spending'),
-        actions: [
-          if (_expenses.isNotEmpty)
-            ShareExportButton(doc: expensesDoc(_expenses)),
-          IconButton(
-            onPressed: () => context.push('/spending/budget'),
-            icon: const Icon(Icons.pie_chart_outline),
-          ),
-          IconButton(
-            onPressed: () => context.push('/spending/log'),
-            icon: const Icon(Icons.add),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Spending')),
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Money',
               title: 'Health',
               highlight: 'spending',
             ),
-            StatCard(
-              label: 'Spent',
-              value: '₱${spent.toStringAsFixed(0)}',
-              caption: budget != null
-                  ? 'of ₱${budget.toStringAsFixed(0)} budget'
-                  : 'this month',
-              icon: Icons.account_balance_wallet_outlined,
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                try {
-                  final res =
-                      await ref.read(vivrantApiProvider).coachSpending();
-                  if (!mounted) return;
-                  context.showInfo(
-                    formatAiResponse(
-                      res,
-                      keys: const ['advice', 'tip', 'suggestion'],
-                    ),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  context.showError(apiErrorMessage(e));
-                }
-              },
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('Spending coach'),
-            ),
-            const SizedBox(height: 16),
-            if (_loading)
-              const Center(child: CircularProgressIndicator())
-            else if (_error != null)
+            if (_error != null)
               EmptyState(
                 message: _error!,
                 action: OutlinedButton(
@@ -178,131 +101,70 @@ class _SpendingScreenState extends ConsumerState<SpendingScreen> {
                   child: const Text('Retry'),
                 ),
               )
-            else if (_expenses.isEmpty)
-              EmptyState(
-                message: 'No expenses yet.',
-                action: ElevatedButton(
-                  onPressed: () => context.push('/spending/log'),
-                  child: const Text('Log expense'),
-                ),
-              )
-            else ...[
-              VivrantSearchField(
-                controller: _query,
-                hintText: 'Search expenses…',
-                onChanged: (_) => setState(() {}),
+            else
+              StatCard(
+                label: 'Spent',
+                value: _loading && _expenses.isEmpty
+                    ? '—'
+                    : '₱${spent.toStringAsFixed(0)}',
+                caption: budget != null
+                    ? 'of ₱${budget.toStringAsFixed(0)} budget'
+                    : 'this month',
+                icon: Icons.account_balance_wallet_outlined,
               ),
-              const SizedBox(height: 14),
-              VivrantFilterChips<String>(
-                options: [
-                  VivrantFilterOption(
-                    value: 'all',
-                    label: 'All',
-                    count: _expenses.length,
-                  ),
-                  ..._categories.map(
-                    (c) => VivrantFilterOption(
-                      value: c,
-                      label: humanizeLabel(c),
-                      count: _expenses.where((e) => e.category == c).length,
+            const SectionGap(),
+            const SectionLabel('Log'),
+            ModuleTile(
+              icon: Icons.add_circle_outline,
+              label: 'Log expense',
+              caption: 'Add a purchase',
+              onTap: () => context.push('/spending/log'),
+            ),
+            const TileGap(),
+            ModuleTile(
+              icon: Icons.receipt_long_outlined,
+              label: 'Expense history',
+              caption: _expenses.isEmpty
+                  ? 'Past purchases'
+                  : '${_expenses.length} this period',
+              onTap: () => context.push('/spending/history'),
+            ),
+            const SectionGap(),
+            const SectionLabel('Tools'),
+            ModuleTile(
+              icon: Icons.table_chart_outlined,
+              label: 'Excel sheet',
+              caption: 'Edit as a table',
+              onTap: () => context.push('/spending/sheet'),
+            ),
+            const TileGap(),
+            ModuleTile(
+              icon: Icons.pie_chart_outline,
+              label: 'Budget',
+              caption: 'Monthly health budget',
+              onTap: () => context.push('/spending/budget'),
+            ),
+            const TileGap(),
+            ModuleTile(
+              icon: Icons.auto_awesome,
+              label: 'Spending coach',
+              caption: 'AI notes on this month',
+              onTap: () async {
+                try {
+                  final res = await ref.read(vivrantApiProvider).coachSpending();
+                  if (!context.mounted) return;
+                  context.showInfo(
+                    formatAiResponse(
+                      res,
+                      keys: const ['advice', 'tip', 'suggestion'],
                     ),
-                  ),
-                ],
-                selected: _filter,
-                onSelected: (v) => setState(() => _filter = v),
-              ),
-              const SizedBox(height: 16),
-              if (filtered.isEmpty)
-                const EmptyState(
-                  message:
-                      'No expenses match these filters. Try All or another search.',
-                )
-              else
-                ...filtered.map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: VivrantPanel(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  e.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Text(
-                                  '${e.category} · ₱${e.amount.toStringAsFixed(0)}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            onPressed: () async {
-                              final draft = await showFieldEditorSheet(
-                                context,
-                                title: 'Edit expense',
-                                fields: {
-                                  'Title': e.title,
-                                  'Category': e.category,
-                                  'Amount': e.amount.toStringAsFixed(0),
-                                  'Date': e.spentAt.toIso8601String().substring(0, 10),
-                                },
-                              );
-                              if (draft == null || !mounted) return;
-                              try {
-                                final updated = await ref.read(vivrantApiProvider).updateExpense(e.id, {
-                                  'title': draft['Title'] ?? e.title,
-                                  'category': draft['Category'] ?? e.category,
-                                  'amount': double.tryParse(draft['Amount'] ?? '') ?? e.amount,
-                                  'spent_at': draft['Date'] ?? e.spentAt.toIso8601String().substring(0, 10),
-                                });
-                                if (!mounted) return;
-                                setState(() {
-                                  _expenses = [for (final item in _expenses) item.id == e.id ? updated : item];
-                                });
-                                _cache();
-                                context.showSuccess('Expense updated');
-                              } catch (err) {
-                                if (!mounted) return;
-                                context.showError(apiErrorMessage(err));
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () async {
-                              final prev = List<Expense>.from(_expenses);
-                              setState(() {
-                                _expenses =
-                                    _expenses.where((x) => x.id != e.id).toList();
-                              });
-                              _cache();
-                              try {
-                                await ref
-                                    .read(vivrantApiProvider)
-                                    .deleteExpense(e.id);
-                                if (!mounted) return;
-                                context.showSuccess('Expense removed');
-                              } catch (err) {
-                                if (!mounted) return;
-                                setState(() => _expenses = prev);
-                                _cache();
-                                context.showError(apiErrorMessage(err));
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  context.showError(apiErrorMessage(e));
+                }
+              },
+            ),
           ],
         ),
       ),

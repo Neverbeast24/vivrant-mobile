@@ -7,6 +7,7 @@ import '../../core/widgets/widgets.dart';
 import '../../shared/constants/app_modules.dart';
 import '../../shared/providers/auth_provider.dart';
 
+/// Module directory (More tab). Catalog lives in `shared/constants/app_modules.dart`.
 class MoreMenuScreen extends ConsumerStatefulWidget {
   const MoreMenuScreen({super.key});
 
@@ -62,12 +63,29 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
         .where((group) => catalog.any((m) => m.group == group))
         .toList();
 
+    var stagger = 0;
+    Widget tileFor(AppModule item) {
+      final delay = Duration(milliseconds: 40 + (stagger++ * 42));
+      return Padding(
+        padding: const EdgeInsets.only(bottom: VivrantLayout.tileGap),
+        child: FadeSlideIn(
+          delay: delay,
+          child: ModuleTile(
+            icon: item.icon,
+            label: item.label,
+            caption: item.caption,
+            onTap: () => context.push(item.path),
+          ),
+        ),
+      );
+    }
+
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: VivrantLayout.pagePadding,
         children: [
           const VivrantBrand(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           const PageHeader(
             eyebrow: 'More',
             title: 'More',
@@ -97,13 +115,14 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
             selected: _selectedGroup,
             onSelected: (group) => setState(() => _selectedGroup = group),
           ),
-          const SizedBox(height: 20),
+          const SectionGap(),
           if (visibleGroups.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: EmptyState(
                 title: 'Nothing found',
                 message: 'Try another word or pick a different category.',
+                icon: Icons.search_off_rounded,
               ),
             )
           else
@@ -119,17 +138,7 @@ class _MoreMenuScreenState extends ConsumerState<MoreMenuScreen> {
                       ),
                 ),
               ),
-              ...grouped[group]!.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: ModuleTile(
-                    icon: item.icon,
-                    label: item.label,
-                    caption: item.caption,
-                    onTap: () => context.push(item.path),
-                  ),
-                ),
-              ),
+              ...grouped[group]!.map(tileFor),
               const SizedBox(height: 8),
             ],
         ],

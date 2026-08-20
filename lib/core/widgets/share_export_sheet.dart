@@ -67,17 +67,17 @@ Future<void> showShareExportSheet(BuildContext context, ShareExportDoc doc) {
               _OptionTile(
                 icon: Icons.share_outlined,
                 label: 'Share via apps',
-                onTap: () => _run(sheetCtx, () => _shareText(doc)),
+                onTap: () => _run(sheetCtx, (origin) => _shareText(doc, origin)),
               ),
               _OptionTile(
                 icon: Icons.copy_rounded,
                 label: 'Copy as text',
-                onTap: () => _run(sheetCtx, () => _copy(doc.text), success: 'Copied as text'),
+                onTap: () => _run(sheetCtx, (_) => _copy(doc.text), success: 'Copied as text'),
               ),
               _OptionTile(
                 icon: Icons.table_chart_outlined,
                 label: 'Copy as CSV',
-                onTap: () => _run(sheetCtx, () => _copy(doc.csv), success: 'Copied as CSV'),
+                onTap: () => _run(sheetCtx, (_) => _copy(doc.csv), success: 'Copied as CSV'),
               ),
               const SizedBox(height: 8),
               Text(
@@ -91,14 +91,14 @@ Future<void> showShareExportSheet(BuildContext context, ShareExportDoc doc) {
               _OptionTile(
                 icon: Icons.description_outlined,
                 label: 'Share TXT file',
-                onTap: () => _run(sheetCtx, () => _shareFile(doc, doc.text, 'txt', 'text/plain')),
+                onTap: () => _run(sheetCtx, (origin) => _shareFile(doc, doc.text, 'txt', 'text/plain', origin)),
               ),
               _OptionTile(
                 icon: Icons.grid_on_outlined,
                 label: 'Share CSV file',
                 onTap: () => _run(
                   sheetCtx,
-                  () => _shareFile(doc, doc.csv, 'csv', 'text/csv'),
+                  (origin) => _shareFile(doc, doc.csv, 'csv', 'text/csv', origin),
                 ),
               ),
               _OptionTile(
@@ -106,7 +106,7 @@ Future<void> showShareExportSheet(BuildContext context, ShareExportDoc doc) {
                 label: 'Share JSON file',
                 onTap: () => _run(
                   sheetCtx,
-                  () => _shareFile(doc, doc.json, 'json', 'application/json'),
+                  (origin) => _shareFile(doc, doc.json, 'json', 'application/json', origin),
                 ),
               ),
             ],
@@ -144,9 +144,23 @@ Future<void> _copy(String text) async {
   await Clipboard.setData(ClipboardData(text: text));
 }
 
-Future<void> _shareText(ShareExportDoc doc) async {
+Rect shareOriginFor(BuildContext context) {
+  final box = context.findRenderObject();
+  if (box is RenderBox && box.hasSize && box.size.width > 0 && box.size.height > 0) {
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+  final size = MediaQuery.sizeOf(context);
+  return Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
+}
+
+Future<void> _shareText(ShareExportDoc doc, Rect origin) async {
   await SharePlus.instance.share(
-    ShareParams(text: doc.text, subject: doc.title, title: doc.title),
+    ShareParams(
+      text: doc.text,
+      subject: doc.title,
+      title: doc.title,
+      sharePositionOrigin: origin,
+    ),
   );
 }
 
@@ -155,6 +169,7 @@ Future<void> _shareFile(
   String content,
   String ext,
   String mime,
+  Rect origin,
 ) async {
   final dir = await getTemporaryDirectory();
   final file = File('${dir.path}/${doc.filename}.$ext');
@@ -164,19 +179,21 @@ Future<void> _shareFile(
       files: [XFile(file.path, mimeType: mime, name: '${doc.filename}.$ext')],
       subject: doc.title,
       title: doc.title,
+      sharePositionOrigin: origin,
     ),
   );
 }
 
 Future<void> _run(
   BuildContext context,
-  Future<void> Function() action, {
+  Future<void> Function(Rect origin) action, {
   String? success,
 }) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
+  final origin = shareOriginFor(context);
   Navigator.of(context).pop();
   try {
-    await action();
+    await action(origin);
     if (success != null) {
       messenger?.showSnackBar(SnackBar(content: Text(success)));
     }

@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Profile, goals, health history, archive, settings, support, and search.
 extension VivrantProfileApi on VivrantApi {
   Future<Profile> getProfile() async {
     final res =
@@ -203,5 +204,43 @@ extension VivrantProfileApi on VivrantApi {
 
   Future<void> unregisterDeviceToken(String token) async {
     await _client.delete('/api/device-tokens', data: {'token': token});
+  }
+
+  Future<List<Map<String, dynamic>>> listArchived() async {
+    final res = await _client.get<Map<String, dynamic>>('/api/mobile/archive');
+    final items = res.data?['items'];
+    if (items is! List) return [];
+    return [
+      for (final item in items)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
+  }
+
+  Future<String> restoreArchived(int id) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/archive',
+      data: {'id': id},
+    );
+    return (res.data?['message'] as String?) ?? 'Restored.';
+  }
+
+  Future<Map<String, dynamic>> exportBackup() async {
+    final res = await _client.get<Map<String, dynamic>>('/api/mobile/archive/export');
+    return Map<String, dynamic>.from(res.data?['dump'] ?? res.data ?? {});
+  }
+
+  Future<List<Map<String, dynamic>>> listActivity({String? entity}) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/api/mobile/activity',
+      query: {
+        if (entity != null && entity.isNotEmpty) 'entity': entity,
+      },
+    );
+    final items = res.data?['items'];
+    if (items is! List) return [];
+    return [
+      for (final item in items)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
   }
 }

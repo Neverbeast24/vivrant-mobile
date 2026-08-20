@@ -8,5 +8,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: VivrantApp()));
     await tester.pump();
     expect(find.byType(VivrantApp), findsOneWidget);
+    // Login/splash uses flutter_animate timers that outlive a single pump.
+    await tester.pump(const Duration(seconds: 1));
   });
 }

@@ -6,13 +6,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
-import '../../../../core/utils/humanize.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/providers/module_cache.dart';
-import '../../../gym/presentation/gym_labels.dart';
 import '../widgets/quick_actions_row.dart';
 
 class TodayScreen extends ConsumerStatefulWidget {
@@ -82,29 +80,33 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
   }
 
   Future<int?> _pickScore(String title) async {
+    int? selected;
     return showModalBottomSheet<int>(
       context: context,
+      showDragHandle: true,
       builder: (context) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-              ),
-              Wrap(
-                spacing: 8,
-                children: List.generate(5, (i) {
-                  final n = i + 1;
-                  return ActionChip(
-                    label: Text('$n'),
-                    onPressed: () => Navigator.pop(context, n),
-                  );
-                }),
-              ),
-              const SizedBox(height: 16),
-            ],
+          child: Padding(
+            padding: VivrantLayout.sheetPadding,
+            child: StatefulBuilder(
+              builder: (context, setSheet) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 20),
+                    ScorePicker(
+                      value: selected,
+                      onChanged: (n) {
+                        setSheet(() => selected = n);
+                        Navigator.pop(context, n);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                );
+              },
+            ),
           ),
         );
       },
@@ -129,7 +131,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
         onRefresh: _load,
         color: c.accent,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: VivrantLayout.pagePadding,
           children: [
             Row(
               children: [
@@ -164,92 +166,52 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             PageHeader(
               eyebrow: 'Today',
               title: 'Hello,',
               highlight: profile?.displayName.split(' ').first ?? 'friend',
             ),
             if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(40),
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const SkeletonFeed()
             else if (_error != null)
               EmptyState(
+                icon: Icons.cloud_off_outlined,
                 message: _error!,
                 action: OutlinedButton(
                   onPressed: _load,
                   child: const Text('Retry'),
                 ),
               )
-            else ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: StatCard(
-                      label: 'Calories',
-                      value: '$calories',
-                      caption: 'logged today',
-                      icon: Icons.local_fire_department_outlined,
-                    ),
+            else
+              ...staggerAppear([
+                VivrantPanel(
+                  title: 'At a glance',
+                  child: Text(
+                    '$calories kcal · $steps steps · $water ml water',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: StatCard(
-                      label: 'Steps',
-                      value: '$steps',
-                      caption: 'of ${profile?.dailyStepGoal ?? 8000}',
-                      icon: Icons.directions_walk,
-                    ),
+                ),
+                const TileGap(),
+                VivrantPanel(
+                  title: 'Quick check-in',
+                  trailing: TextButton(
+                    onPressed: _quickCheckin,
+                    child: const Text('Log'),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              StatCard(
-                label: 'Water',
-                value: '$water ml',
-                caption: 'goal ${profile?.dailyWaterGoalMl ?? 2500} ml',
-                icon: Icons.water_drop_outlined,
-              ),
-              const SizedBox(height: 18),
-              VivrantPanel(
-                title: 'Quick check-in',
-                trailing: TextButton(
-                  onPressed: _quickCheckin,
-                  child: const Text('Log'),
+                  child: Text(
+                    checkin == null
+                        ? 'How is your energy and mood today?'
+                        : 'Energy ${checkin['energy'] ?? '—'} · Mood ${checkin['mood'] ?? '—'}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                 ),
-                child: Text(
-                  checkin == null
-                      ? 'How is your energy and mood today?'
-                      : 'Energy ${checkin['energy'] ?? '—'} · Mood ${checkin['mood'] ?? '—'}',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                const SectionGap(),
+                QuickActionsRow(
+                  programCaption: _programCaption(_data?['program']),
+                  mealsToday: (_data?['meals_today'] as num?)?.toInt() ?? 0,
                 ),
-              ),
-              const SizedBox(height: 18),
-              _TodayProgramCard(program: _data?['program']),
-              const SizedBox(height: 18),
-              _TodayDoNow(
-                habits: (_data?['habits'] as List? ?? const [])
-                    .whereType<Map>()
-                    .map((e) => Map<String, dynamic>.from(e))
-                    .toList(),
-                groceries: (_data?['groceries'] as List? ?? const [])
-                    .whereType<Map>()
-                    .map((e) => Map<String, dynamic>.from(e))
-                    .toList(),
-                waterMl: water,
-                calories: calories,
-                onChanged: _load,
-              ),
-              const SizedBox(height: 18),
-              QuickActionsRow(
-                programCaption: _programCaption(_data?['program']),
-                mealsToday: (_data?['meals_today'] as num?)?.toInt() ?? 0,
-                habitsDone: (_data?['habits_done_today'] as num?)?.toInt(),
-                habitsTotal: (_data?['habits_total'] as num?)?.toInt(),
-              ),
-            ],
+              ]),
           ],
         ),
       ),
@@ -266,229 +228,3 @@ String? _programCaption(Object? raw) {
   if (count > 1) return '$title · $count saved';
   return title;
 }
-
-class _TodayProgramCard extends StatelessWidget {
-  const _TodayProgramCard({required this.program});
-
-  final Object? program;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = VivrantColors.of(context);
-    final raw = program;
-    final plan = raw is Map ? Map<String, dynamic>.from(raw) : null;
-    final today = plan?['today'] is Map
-        ? Map<String, dynamic>.from(plan!['today'] as Map)
-        : null;
-    final exercises = (today?['exercises'] as List?)
-            ?.whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList() ??
-        const <Map<String, dynamic>>[];
-
-    return VivrantPanel(
-      title: 'Training program',
-      trailing: TextButton(
-        onPressed: () => context.push(plan == null ? '/gym/plans' : '/gym/sessions'),
-        child: Text(plan == null ? 'Create' : 'Start'),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (plan == null)
-            Text(
-              'No program yet. Create a weekly plan and it will show up here on your training days.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            )
-          else ...[
-            Text(
-              plan['title']?.toString() ?? 'Your program',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              [
-                if ((plan['focus']?.toString() ?? '').isNotEmpty)
-                  humanizeLabel(plan['focus'].toString()),
-                if ((plan['trainingDays'] as List?)?.isNotEmpty == true)
-                  formatTrainingDaysLabel([
-                    for (final item in plan['trainingDays'] as List)
-                      if (item is num) item.round(),
-                  ])
-                else if (plan['daysPerWeek'] != null)
-                  '${plan['daysPerWeek']} days/week',
-                if ((plan['planCount'] as num?)?.toInt() != null &&
-                    (plan['planCount'] as num).toInt() > 1)
-                  '${plan['planCount']} saved',
-              ].join(' · '),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: c.ink.withValues(alpha: 0.62),
-                  ),
-            ),
-            if (today != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Today · ${today['day'] ?? ''} · ${humanizeLabel(today['focus']?.toString() ?? '')}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: c.accent,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final ex in exercises.take(4))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    [
-                      ex['name']?.toString() ?? '',
-                      if ((ex['sets']?.toString() ?? '').isNotEmpty) ex['sets'],
-                    ].where((part) => (part ?? '').toString().isNotEmpty).join(' · '),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-            ] else ...[
-              const SizedBox(height: 12),
-              Text(
-                [
-                  'Rest day — nothing programmed today',
-                  if ((plan['nextSession']?.toString() ?? '').isNotEmpty)
-                    'next session ${plan['nextSession']}',
-                ].join(' · '),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TodayDoNow extends ConsumerWidget {
-  const _TodayDoNow({
-    required this.habits,
-    required this.groceries,
-    required this.waterMl,
-    required this.calories,
-    required this.onChanged,
-  });
-
-  final List<Map<String, dynamic>> habits;
-  final List<Map<String, dynamic>> groceries;
-  final int waterMl;
-  final int calories;
-  final Future<void> Function() onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        VivrantPanel(
-          title: 'Habits today',
-          trailing: TextButton(
-            onPressed: () => context.push('/habits'),
-            child: const Text('All'),
-          ),
-          child: habits.isEmpty
-              ? const Text('Add a habit so it shows up here each morning.')
-              : Column(
-                  children: [
-                    for (final habit in habits)
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(habit['title']?.toString() ?? 'Habit'),
-                        value: habit['done_today'] == true,
-                        onChanged: (v) async {
-                          try {
-                            await ref.read(vivrantApiProvider).toggleHabit(
-                                  (habit['id'] as num).toInt(),
-                                  v ?? false,
-                                );
-                            await onChanged();
-                          } catch (e) {
-                            if (context.mounted) {
-                              context.showError(apiErrorMessage(e));
-                            }
-                          }
-                        },
-                      ),
-                  ],
-                ),
-        ),
-        const SizedBox(height: 12),
-        VivrantPanel(
-          title: 'Water · $waterMl ml · $calories kcal today',
-          trailing: TextButton(
-            onPressed: () => context.push('/nutrition/log'),
-            child: const Text('Meal'),
-          ),
-          child: Wrap(
-            spacing: 8,
-            children: [
-              for (final ml in [250, 500])
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      await ref.read(vivrantApiProvider).addHydration(ml);
-                      if (context.mounted) context.showSuccess('+$ml ml');
-                      await onChanged();
-                    } catch (e) {
-                      if (context.mounted) {
-                        context.showError(apiErrorMessage(e));
-                      }
-                    }
-                  },
-                  child: Text('+$ml ml'),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        VivrantPanel(
-          title: 'Shopping',
-          trailing: TextButton(
-            onPressed: () => context.push('/groceries'),
-            child: const Text('List'),
-          ),
-          child: groceries.isEmpty
-              ? const Text('Shopping list is clear.')
-              : Column(
-                  children: [
-                    for (final item in groceries.take(6))
-                      CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(item['name']?.toString() ?? 'Item'),
-                        subtitle: item['quantity'] == null
-                            ? null
-                            : Text(item['quantity'].toString()),
-                        value: false,
-                        onChanged: (_) async {
-                          try {
-                            await ref.read(vivrantApiProvider).toggleGrocery(
-                                  (item['id'] as num).toInt(),
-                                  true,
-                                );
-                            if (context.mounted) {
-                              context.showSuccess('Checked · pantry restocked');
-                            }
-                            await onChanged();
-                          } catch (e) {
-                            if (context.mounted) {
-                              context.showError(apiErrorMessage(e));
-                            }
-                          }
-                        },
-                      ),
-                  ],
-                ),
-        ),
-      ],
-    );
-  }
-}
-

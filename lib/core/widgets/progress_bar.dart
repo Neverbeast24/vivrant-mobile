@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/vivrant_colors.dart';
+import '../theme/vivrant_motion.dart';
 
 /// Accent-filled progress track (goals, pantry stock, budgets).
 class VivrantProgressBar extends StatelessWidget {
@@ -25,11 +26,20 @@ class VivrantProgressBar extends StatelessWidget {
         child: Stack(
           children: [
             Container(color: c.ink.withValues(alpha: 0.08)),
-            FractionallySizedBox(
-              widthFactor: clamped,
-              child: Container(
-                decoration: BoxDecoration(gradient: c.brandGradient),
-              ),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: clamped),
+              duration: VivrantMotion.reduce(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 700),
+              curve: VivrantMotion.emphasized,
+              builder: (context, animated, _) {
+                return FractionallySizedBox(
+                  widthFactor: animated,
+                  child: Container(
+                    decoration: BoxDecoration(gradient: c.brandGradient),
+                  ),
+                );
+              },
             ),
           ],
         ),

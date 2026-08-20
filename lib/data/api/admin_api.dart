@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Staff console: overview, users, tickets, audit, and system tools.
 extension VivrantAdminApi on VivrantApi {
   Future<Map<String, dynamic>> adminOverview() async {
     final res = await _client.get<Map<String, dynamic>>(

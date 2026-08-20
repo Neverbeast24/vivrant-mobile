@@ -1,9 +1,20 @@
 part of '../vivrant_api.dart';
 
+/// Groceries, pantry, and spending.
 extension VivrantHouseholdApi on VivrantApi {
   Future<List<GroceryItem>> listGroceries() async {
     final res =
         await _client.get<Map<String, dynamic>>('/api/mobile/groceries');
+    return (res.data?['items'] as List? ?? [])
+        .map((e) => GroceryItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<GroceryItem>> addGroceryBulk(String text) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/groceries/bulk',
+      data: {'text': text},
+    );
     return (res.data?['items'] as List? ?? [])
         .map((e) => GroceryItem.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -91,6 +102,16 @@ extension VivrantHouseholdApi on VivrantApi {
         .toList();
   }
 
+  Future<List<PantryItem>> addPantryBulk(String text) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/pantry/bulk',
+      data: {'text': text},
+    );
+    return (res.data?['items'] as List? ?? [])
+        .map((e) => PantryItem.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
   Future<PantryItem> addPantry(Map<String, dynamic> body) async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/mobile/pantry',
@@ -135,6 +156,16 @@ extension VivrantHouseholdApi on VivrantApi {
   Future<List<Expense>> listExpenses() async {
     final res = await _client.get<Map<String, dynamic>>(
       '/api/mobile/spending/expenses',
+    );
+    return (res.data?['expenses'] as List? ?? [])
+        .map((e) => Expense.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<Expense>> addExpenseBulk(String text) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/spending/expenses/bulk',
+      data: {'text': text},
     );
     return (res.data?['expenses'] as List? ?? [])
         .map((e) => Expense.fromJson(Map<String, dynamic>.from(e as Map)))

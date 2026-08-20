@@ -9,7 +9,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
 import '../../../../shared/providers/module_cache.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 import '../widgets/exercise_demo_card.dart';
 import '../widgets/exercise_demo_sheet.dart';
 import '../widgets/todays_program_moves.dart';
@@ -120,7 +120,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Equipment',
@@ -133,7 +133,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
               machinesOnly: true,
               onSelect: (exercise) => showExerciseDemoSheet(context, exercise),
             ),
-            const SizedBox(height: 12),
+            const SectionGap(),
             Text(
               'Browse machines and watch short demos. Or get simple suggestions for you.',
               style: Theme.of(context).textTheme.bodyMedium,
@@ -166,7 +166,7 @@ class _GymMachinesScreenState extends ConsumerState<GymMachinesScreen> {
                     builder: (ctx) {
                       return SafeArea(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          padding: VivrantLayout.sheetPadding,
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,

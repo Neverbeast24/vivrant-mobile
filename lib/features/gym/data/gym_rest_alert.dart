@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 
 /// Rest-timer alarm: system sound plus vibration / haptics.
+///
+/// Lives under `gym/data/` because it is a device helper, not a widget.
 class GymRestAlert {
   static Future<void> fire() async {
     await SystemSound.play(SystemSoundType.alert);

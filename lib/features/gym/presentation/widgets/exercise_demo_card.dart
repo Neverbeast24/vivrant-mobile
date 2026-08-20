@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../shared/models/gym_exercise.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 
 class ExerciseDemoCard extends StatelessWidget {
   const ExerciseDemoCard({
@@ -32,7 +32,7 @@ class ExerciseDemoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: c.ink.withValues(alpha: 0.08)),
@@ -174,7 +174,10 @@ class _DifficultyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = difficultyColor(label);
+    final color = difficultyColor(
+      label,
+      brightness: Theme.of(context).brightness,
+    );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(

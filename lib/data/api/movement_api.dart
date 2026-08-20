@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Daily activity / workout log.
 extension VivrantMovementApi on VivrantApi {
   Future<List<WorkoutLog>> listWorkouts({String? date}) async {
     final res = await _client.get<Map<String, dynamic>>(

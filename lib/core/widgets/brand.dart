@@ -22,8 +22,8 @@ class VivrantBrand extends StatelessWidget {
     final c = VivrantColors.forBrightness(
       isDark ? Brightness.dark : Brightness.light,
     );
-    final ink = isDark ? Colors.white : c.ink;
-    final muted = isDark ? Colors.white60 : c.muted;
+    final ink = c.ink;
+    final muted = c.muted;
 
     final mark = Container(
       width: 40,

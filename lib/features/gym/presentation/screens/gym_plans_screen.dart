@@ -13,16 +13,23 @@ import '../../../../data/vivrant_api.dart';
 import '../../../../shared/models/gym_exercise.dart';
 import '../../../../shared/providers/module_cache.dart';
 import '../../../../shared/providers/persistent_store.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 import '../widgets/exercise_demo_sheet.dart';
 import '../widgets/saved_plan_editor_sheet.dart';
 
 class GymPlansScreen extends ConsumerStatefulWidget {
-  const GymPlansScreen({super.key});
+  const GymPlansScreen({
+    super.key,
+    this.view = GymPlansView.builder,
+  });
+
+  final GymPlansView view;
 
   @override
   ConsumerState<GymPlansScreen> createState() => _GymPlansScreenState();
 }
+
+enum GymPlansView { builder, saved }
 
 class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   static const _prefsDaysKey = 'vivrant.gym.plan.days';
@@ -39,6 +46,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   final _sessionCtrl = TextEditingController(text: '45');
 
   List<Map<String, dynamic>> _plans = [];
+  List<Map<String, dynamic>> _programHistory = [];
   Map<String, dynamic>? _draft;
   List<GymExercise> _exercises = const [];
   final Set<String> _knownSlugs = {};
@@ -161,6 +169,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       final api = ref.read(vivrantApiProvider);
       final plans = await api.gymPlans();
       final exerciseRows = await api.gymExercises();
+      var history = <Map<String, dynamic>>[];
+      try {
+        history = await api.listActivity(entity: 'gym_plans');
+      } catch (_) {}
       Map<String, dynamic>? draft;
       var remoteDraftOk = false;
       try {
@@ -178,6 +190,7 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
       }
       setState(() {
         _plans = plans;
+        _programHistory = history;
         _exercises = exercises;
         _loading = false;
       });
@@ -352,6 +365,13 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   }
 
   Future<void> _discardDraft() async {
+    final ok = await confirmAction(
+      context,
+      title: 'Clear this draft?',
+      body: 'Unsaved generated days will be discarded.',
+      confirmLabel: 'Clear',
+    );
+    if (!ok || !mounted) return;
     try {
       await ref.read(vivrantApiProvider).discardGymProgramDraft();
       if (!mounted) return;
@@ -488,32 +508,36 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
   Widget build(BuildContext context) {
     final filtered = _filtered;
     final theme = Theme.of(context);
+    final isBuilder = widget.view == GymPlansView.builder;
+    final isSaved = widget.view == GymPlansView.saved;
     return GradientScaffold(
       appBar: AppBar(
-        title: const Text('Training program'),
+        title: Text(isSaved ? 'Saved programs' : 'Create program'),
         actions: [
-          if (_plans.isNotEmpty)
+          if (isSaved && _plans.isNotEmpty)
             ShareExportButton(doc: gymPlansDoc(_plans)),
-          IconButton(
-            onPressed: _generating ? null : _createAi,
-            icon: _generating
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.auto_awesome),
-          ),
+          if (isBuilder)
+            IconButton(
+              onPressed: _generating ? null : _createAi,
+              icon: _generating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome),
+            ),
         ],
       ),
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
+            if (isBuilder) ...[
             const PageHeader(
               eyebrow: 'Gym',
-              title: 'Training',
+              title: 'Create',
               highlight: 'program',
             ),
             Text(
@@ -816,6 +840,14 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                 onShare: () => showShareExportSheet(context, gymProgramDraftDoc(_draft!)),
               ),
             if (_draft != null) const SizedBox(height: 18),
+            ],
+            if (isSaved) ...[
+            const PageHeader(
+              eyebrow: 'Gym',
+              title: 'Saved',
+              highlight: 'programs',
+            ),
+            const SizedBox(height: 8),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 48),
@@ -832,10 +864,11 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
             else if (_plans.isEmpty)
               EmptyState(
                 title: 'No program yet',
-                message: 'Choose how often you train and your experience above, then generate workouts and keep the days you like.',
+                message:
+                    'Create a week of workouts, keep the days you like, then save.',
                 action: ElevatedButton(
-                  onPressed: _generating ? null : _createAi,
-                  child: const Text('Generate workouts'),
+                  onPressed: () => context.push('/gym/plans/build'),
+                  child: const Text('Create a program'),
                 ),
               )
             else ...[
@@ -915,6 +948,10 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                       },
                       onDelete: () async {
                         final id = (p['id'] as num).toInt();
+                        final title = (p['title'] as String?)?.trim().isNotEmpty == true
+                            ? p['title'] as String
+                            : 'this program';
+                        if (!(await confirmDelete(context, label: title))) return;
                         try {
                           await ref.read(vivrantApiProvider).deleteGymPlan(id);
                           if (!mounted) return;
@@ -934,6 +971,33 @@ class _GymPlansScreenState extends ConsumerState<GymPlansScreen> {
                         }
                       },
                     )),
+            ],
+              if (!_loading && _error == null && _programHistory.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const SectionLabel('Program history'),
+                const SizedBox(height: 8),
+                for (final item in _programHistory.take(12)) ...[
+                  VivrantPanel(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        (item['title'] as String?)?.trim().isNotEmpty == true
+                            ? item['title'] as String
+                            : 'Gym program',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      subtitle: Text(
+                        [
+                          item['detail'] as String?,
+                          item['created_at'] as String?,
+                        ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' · '),
+                      ),
+                      onTap: () => context.push('/profile/activity'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
             ],
           ],
         ),

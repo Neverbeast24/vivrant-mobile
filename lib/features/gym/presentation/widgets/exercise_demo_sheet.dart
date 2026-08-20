@@ -6,7 +6,7 @@ import '../../../../core/theme/vivrant_colors.dart';
 import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../shared/models/gym_exercise.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 
 Future<void> showExerciseDemoSheet(
   BuildContext context,
@@ -148,7 +148,10 @@ class ExerciseDemoSheet extends StatelessWidget {
                     _MetaChip(
                       icon: Icons.signal_cellular_alt_rounded,
                       label: humanizeLabel(exercise.difficulty),
-                      color: difficultyColor(exercise.difficulty),
+                      color: difficultyColor(
+                        exercise.difficulty,
+                        brightness: Theme.of(context).brightness,
+                      ),
                     ),
                   if (exercise.durationSeconds > 0)
                     _MetaChip(

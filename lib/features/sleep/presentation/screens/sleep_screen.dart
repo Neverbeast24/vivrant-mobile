@@ -78,7 +78,7 @@ class _SleepScreenState extends ConsumerState<SleepScreen> {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Sleep')),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           const PageHeader(
             eyebrow: 'Rest',
@@ -87,7 +87,7 @@ class _SleepScreenState extends ConsumerState<SleepScreen> {
           ),
           if (_today.isNotEmpty) ...[
             WellnessPulseBar(today: _today, current: 'sleep'),
-            const SizedBox(height: 16),
+            const SectionGap(),
           ],
           VivrantPanel(
             title: 'Last night',
@@ -128,7 +128,7 @@ class _SleepScreenState extends ConsumerState<SleepScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SectionGap(),
           OutlinedButton.icon(
             onPressed: _coach,
             icon: const Icon(Icons.auto_awesome),

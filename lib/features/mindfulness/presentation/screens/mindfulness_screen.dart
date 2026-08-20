@@ -82,7 +82,7 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Mindfulness')),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           const PageHeader(
             eyebrow: 'Calm',
@@ -91,7 +91,7 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
           ),
           if (_today.isNotEmpty) ...[
             WellnessPulseBar(today: _today, current: 'mindfulness'),
-            const SizedBox(height: 16),
+            const SectionGap(),
           ],
           VivrantPanel(
             title: 'Mood (1–5)',
@@ -115,7 +115,7 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
                     );
                   }),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 18),
                 TextField(
                   controller: _note,
                   decoration: const InputDecoration(labelText: 'Note (optional)'),
@@ -129,7 +129,7 @@ class _MindfulnessScreenState extends ConsumerState<MindfulnessScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SectionGap(),
           OutlinedButton.icon(
             onPressed: _coach,
             icon: const Icon(Icons.auto_awesome),

@@ -30,16 +30,11 @@ class _GymNavCardState extends State<GymNavCard> {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final ink = dark ? VivrantColors.darkInk : VivrantColors.ink;
-    final muted = dark ? VivrantColors.darkMuted : VivrantColors.muted;
-    final accent = dark ? VivrantColors.darkAccent : VivrantColors.accent;
-    final soft = dark ? VivrantColors.darkAccentSoft : VivrantColors.accentSoft;
+    final c = VivrantColors.of(context);
 
     final bg = widget.featured
         ? null
-        : (dark ? VivrantColors.darkPanel : Colors.white)
-            .withValues(alpha: dark ? 0.92 : 0.96);
+        : c.panel.withValues(alpha: c.isDark ? 0.92 : 0.96);
 
     return AnimatedScale(
       scale: _pressed ? 0.97 : 1,
@@ -57,21 +52,17 @@ class _GymNavCardState extends State<GymNavCard> {
           child: Ink(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: widget.featured
-                  ? (dark
-                      ? VivrantColors.darkBrandGradient
-                      : VivrantColors.brandGradient)
-                  : null,
+              gradient: widget.featured ? c.brandGradient : null,
               color: bg,
               border: widget.featured
                   ? null
-                  : Border.all(color: ink.withValues(alpha: 0.06)),
+                  : Border.all(color: c.ink.withValues(alpha: 0.06)),
               boxShadow: [
                 BoxShadow(
-                  color: accent.withValues(
+                  color: c.accent.withValues(
                     alpha: widget.featured
-                        ? (dark ? 0.28 : 0.18)
-                        : (dark ? 0.08 : 0.05),
+                        ? (c.isDark ? 0.28 : 0.18)
+                        : (c.isDark ? 0.08 : 0.05),
                   ),
                   blurRadius: widget.featured ? 22 : 18,
                   offset: const Offset(0, 10),
@@ -88,14 +79,14 @@ class _GymNavCardState extends State<GymNavCard> {
                     height: 40,
                     decoration: BoxDecoration(
                       color: widget.featured
-                          ? Colors.white.withValues(alpha: 0.18)
-                          : soft,
+                          ? c.onAccent.withValues(alpha: 0.18)
+                          : c.accentSoft,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       widget.icon,
                       size: 20,
-                      color: widget.featured ? Colors.white : accent,
+                      color: widget.featured ? c.onAccent : c.accent,
                     ),
                   ),
                   const Spacer(),
@@ -105,7 +96,7 @@ class _GymNavCardState extends State<GymNavCard> {
                       fontWeight: FontWeight.w800,
                       fontSize: 15,
                       height: 1.2,
-                      color: widget.featured ? Colors.white : ink,
+                      color: widget.featured ? c.onAccent : c.ink,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -118,8 +109,8 @@ class _GymNavCardState extends State<GymNavCard> {
                       fontWeight: FontWeight.w500,
                       height: 1.3,
                       color: widget.featured
-                          ? Colors.white.withValues(alpha: 0.82)
-                          : muted,
+                          ? c.onAccent.withValues(alpha: 0.82)
+                          : c.muted,
                     ),
                   ),
                 ],

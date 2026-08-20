@@ -1,3 +1,6 @@
+/// JSON models for `/api/mobile/*` payloads. One type per file.
+library;
+
 export 'ai_chat_message.dart';
 export 'app_notification.dart';
 export 'checkin.dart';

@@ -22,7 +22,8 @@ final vivrantApiProvider = Provider<VivrantApi>((ref) {
 
 /// Typed wrappers for `/api/mobile/*` endpoints (see docs/MOBILE_API_SPEC.md).
 ///
-/// Domain methods live in `lib/data/api/*` as same-library extensions.
+/// Domain methods live in `lib/data/api/*` as same-library extensions:
+/// auth, today, nutrition, movement, gym, wellness, household, ai, profile, admin.
 class VivrantApi {
   VivrantApi(this._client);
 

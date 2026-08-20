@@ -21,6 +21,7 @@ abstract final class VivrantColors {
   static const solidFg = Color(0xFFFFFFFF);
   static const inverse = Color(0xFF14221B);
   static const inverseFg = Color(0xFFFFFFFF);
+  static const onAccent = Color(0xFFFFFFFF);
 
   // Dark
   static const darkInk = Color(0xFFE8F0EB);
@@ -38,6 +39,10 @@ abstract final class VivrantColors {
   static const darkBody1 = Color(0xFF121A16);
   static const darkSolid = Color(0xFF0A100D);
   static const darkWarm = Color(0xFF2A322C);
+  static const darkOnAccent = Color(0xFF0A100D);
+  static const darkInverse = Color(0xFFE8F0EB);
+  static const darkInverseFg = Color(0xFF0F1612);
+  static const darkSolidFg = Color(0xFFE8F0EB);
 
   static const line = Color(0x1C14221B);
   static const darkLine = Color(0x33E8F0EB);
@@ -85,11 +90,19 @@ class VivrantPalette {
     required this.accent,
     required this.accentDeep,
     required this.accentSoft,
+    required this.onAccent,
     required this.cyan,
     required this.card,
     required this.panel,
     required this.surface,
     required this.surfaceSoft,
+    required this.solid,
+    required this.solidFg,
+    required this.inverse,
+    required this.inverseFg,
+    required this.warm,
+    required this.paper,
+    required this.line,
     required this.brandGradient,
     required this.bodyGradient,
   });
@@ -100,11 +113,19 @@ class VivrantPalette {
   final Color accent;
   final Color accentDeep;
   final Color accentSoft;
+  final Color onAccent;
   final Color cyan;
   final Color card;
   final Color panel;
   final Color surface;
   final Color surfaceSoft;
+  final Color solid;
+  final Color solidFg;
+  final Color inverse;
+  final Color inverseFg;
+  final Color warm;
+  final Color paper;
+  final Color line;
   final LinearGradient brandGradient;
   final LinearGradient bodyGradient;
 
@@ -118,11 +139,19 @@ class VivrantPalette {
     accent: VivrantColors.accent,
     accentDeep: VivrantColors.accentDeep,
     accentSoft: VivrantColors.accentSoft,
+    onAccent: VivrantColors.onAccent,
     cyan: VivrantColors.cyan,
     card: VivrantColors.card,
     panel: VivrantColors.panel,
     surface: VivrantColors.surface,
     surfaceSoft: VivrantColors.surfaceSoft,
+    solid: VivrantColors.solid,
+    solidFg: VivrantColors.solidFg,
+    inverse: VivrantColors.inverse,
+    inverseFg: VivrantColors.inverseFg,
+    warm: VivrantColors.warm,
+    paper: VivrantColors.paper,
+    line: VivrantColors.line,
     brandGradient: VivrantColors.brandGradient,
     bodyGradient: VivrantColors.bodyGradient,
   );
@@ -134,11 +163,19 @@ class VivrantPalette {
     accent: VivrantColors.darkAccent,
     accentDeep: VivrantColors.darkAccentDeep,
     accentSoft: VivrantColors.darkAccentSoft,
+    onAccent: VivrantColors.darkOnAccent,
     cyan: VivrantColors.darkCyan,
     card: VivrantColors.darkCard,
     panel: VivrantColors.darkPanel,
     surface: VivrantColors.darkSurface,
     surfaceSoft: VivrantColors.darkSurfaceSoft,
+    solid: VivrantColors.darkSolid,
+    solidFg: VivrantColors.darkSolidFg,
+    inverse: VivrantColors.darkInverse,
+    inverseFg: VivrantColors.darkInverseFg,
+    warm: VivrantColors.darkWarm,
+    paper: VivrantColors.darkPaper,
+    line: VivrantColors.darkLine,
     brandGradient: VivrantColors.darkBrandGradient,
     bodyGradient: VivrantColors.darkBodyGradient,
   );

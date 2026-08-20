@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ambient_orbs.dart';
 import '../theme/vivrant_colors.dart';
 
 class GradientScaffold extends StatelessWidget {
@@ -10,6 +11,7 @@ class GradientScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.bottomNavigationBar,
     this.extendBody = false,
+    this.atmosphere = true,
   });
 
   final Widget child;
@@ -17,23 +19,28 @@ class GradientScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final Widget? bottomNavigationBar;
   final bool extendBody;
+  final bool atmosphere;
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final c = VivrantColors.of(context);
     return Container(
-      decoration: BoxDecoration(
-        gradient: dark
-            ? VivrantColors.darkBodyGradient
-            : VivrantColors.bodyGradient,
-      ),
+      decoration: BoxDecoration(gradient: c.bodyGradient),
       child: Scaffold(
         backgroundColor: Colors.transparent,
         extendBody: extendBody,
         appBar: appBar,
         floatingActionButton: floatingActionButton,
         bottomNavigationBar: bottomNavigationBar,
-        body: child,
+        body: atmosphere
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  const AmbientOrbs(),
+                  child,
+                ],
+              )
+            : child,
       ),
     );
   }

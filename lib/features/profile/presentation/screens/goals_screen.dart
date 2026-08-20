@@ -259,7 +259,7 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: VivrantLayout.pagePadding,
           children: [
             FadeTransition(
               opacity: CurvedAnimation(
@@ -529,6 +529,8 @@ class _GoalsScreenState extends ConsumerState<GoalsScreen>
                                     return;
                                   }
                                   if (v == 'delete') {
+                                    if (!(await confirmDelete(context, label: g.title))) return;
+                                    if (!mounted) return;
                                     _setGoals(
                                       _goals.where((x) => x.id != g.id).toList(),
                                     );

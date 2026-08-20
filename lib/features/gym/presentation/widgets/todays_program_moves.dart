@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/widgets/widgets.dart';
 import '../../../../shared/models/gym_exercise.dart';
-import '../gym_labels.dart';
+import '../../data/gym_labels.dart';
 
 class TodaysProgramMoves extends StatelessWidget {
   const TodaysProgramMoves({

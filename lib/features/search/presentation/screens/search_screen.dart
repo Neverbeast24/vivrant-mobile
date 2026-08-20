@@ -110,7 +110,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         leading: BackButton(onPressed: () => context.pop()),
       ),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           const PageHeader(
             eyebrow: 'Find',

@@ -19,7 +19,7 @@ class LogExpenseScreen extends ConsumerStatefulWidget {
 class _LogExpenseScreenState extends ConsumerState<LogExpenseScreen> {
   final _title = TextEditingController();
   final _amount = TextEditingController();
-  String _category = 'groceries';
+  String _category = 'food';
   bool _loading = false;
   Map<String, dynamic>? _overview;
   List<Expense> _recent = const [];
@@ -51,6 +51,10 @@ class _LogExpenseScreenState extends ConsumerState<LogExpenseScreen> {
   }
 
   Future<void> _save() async {
+    if (_title.text.trim().isEmpty) {
+      context.showError('Enter a title.');
+      return;
+    }
     setState(() => _loading = true);
     try {
       await ref.read(vivrantApiProvider).addExpense({
@@ -73,7 +77,7 @@ class _LogExpenseScreenState extends ConsumerState<LogExpenseScreen> {
     return GradientScaffold(
       appBar: AppBar(title: const Text('Log expense')),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: VivrantLayout.pagePadding,
         children: [
           if (_overview != null) ...[
             StatCard(

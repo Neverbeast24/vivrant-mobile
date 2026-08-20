@@ -22,7 +22,6 @@ class HabitsScreen extends ConsumerStatefulWidget {
 class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   final _query = TextEditingController();
   List<Habit> _habits = [];
-  List<Map<String, dynamic>> _challenges = [];
   bool _loading = true;
   String? _error;
   String _filter = 'all';
@@ -70,12 +69,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       try {
         order = parseModuleListOrder(await api.getPreferences(), 'habits');
       } catch (_) {}
-      List<Map<String, dynamic>> challenges = const [];
-      try {
-        challenges = await api.listChallenges();
-      } catch (_) {}
       if (!mounted) return;
-      _challenges = challenges;
       _setHabits(applyIdOrder(habits, order, (h) => h.id));
     } catch (e) {
       if (!mounted) return;
@@ -143,6 +137,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
   }
 
   Future<void> _delete(Habit h) async {
+    final ok = await confirmDelete(context, label: h.title);
+    if (!ok || !mounted) return;
     final prev = List<Habit>.from(_habits);
     _setHabits(_habits.where((item) => item.id != h.id).toList());
     try {
@@ -236,17 +232,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       appBar: AppBar(
         title: const Text('Habits'),
         actions: [
-          IconButton(
-            onPressed: () => context.push('/habits/challenges'),
-            icon: const Icon(Icons.emoji_events_outlined),
-          ),
           IconButton(onPressed: _add, icon: const Icon(Icons.add)),
         ],
       ),
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Consistency',
@@ -259,36 +251,21 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               caption: 'completed',
               icon: Icons.local_fire_department_outlined,
             ),
-            if (_challenges.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              VivrantPanel(
-                title: 'This week’s challenges',
-                trailing: TextButton(
-                  onPressed: () => context.push('/habits/challenges'),
-                  child: const Text('All'),
-                ),
-                child: Column(
-                  children: [
-                    for (final c in _challenges.take(3))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: ListRow(
-                          title: c['title']?.toString() ?? 'Challenge',
-                          subtitle:
-                              '${c['current_value'] ?? 0} / ${c['target_value'] ?? 0}',
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _suggestAi,
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('Suggest habits with AI'),
+            const SectionGap(),
+            ModuleTile(
+              icon: Icons.emoji_events_outlined,
+              label: 'Challenges',
+              caption: 'Weekly streaks and extras',
+              onTap: () => context.push('/habits/challenges'),
             ),
-            const SizedBox(height: 16),
+            const TileGap(),
+            ModuleTile(
+              icon: Icons.auto_awesome,
+              label: 'AI habit ideas',
+              caption: 'Suggestions from recent logs',
+              onTap: _suggestAi,
+            ),
+            const SectionGap(),
             if (_loading)
               const Center(child: CircularProgressIndicator())
             else if (_error != null)
@@ -358,7 +335,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   itemBuilder: (context, index) {
                     final h = filtered[index];
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: VivrantLayout.itemGap),
                       child: VivrantPanel(
                         child: Row(
                           children: [

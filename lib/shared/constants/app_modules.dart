@@ -127,6 +127,20 @@ const appModules = <AppModule>[
     group: ModuleGroup.account,
   ),
   AppModule(
+    icon: Icons.receipt_long_outlined,
+    label: 'Activity',
+    caption: 'Your change history',
+    path: '/profile/activity',
+    group: ModuleGroup.account,
+  ),
+  AppModule(
+    icon: Icons.inventory_2_outlined,
+    label: 'Archived',
+    caption: 'Restore deleted items',
+    path: '/profile/archive',
+    group: ModuleGroup.account,
+  ),
+  AppModule(
     icon: Icons.support_agent,
     label: 'Help',
     caption: 'Support tickets',

@@ -100,7 +100,7 @@ class _AdminAuditScreenState extends ConsumerState<AdminAuditScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Admin',

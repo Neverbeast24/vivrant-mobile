@@ -72,7 +72,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         title: const Text('Change password'),
       ),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: VivrantLayout.pagePadding,
         children: [
           const PageHeader(
             eyebrow: 'Security',

@@ -2,6 +2,7 @@ part of '../vivrant_api.dart';
 
 String _normalizeEmail(String email) => email.trim().toLowerCase();
 
+/// Login, signup, and password-reset REST methods.
 extension VivrantAuthApi on VivrantApi {
   Future<Map<String, dynamic>> login({
     required String email,

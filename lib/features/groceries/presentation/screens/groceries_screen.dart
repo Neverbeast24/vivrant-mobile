@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/context_extensions.dart';
@@ -21,11 +22,16 @@ class GroceriesScreen extends ConsumerStatefulWidget {
 
 class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
   final _query = TextEditingController();
+  final _quickName = TextEditingController();
+  final _sheetName = TextEditingController();
+  final _sheetQty = TextEditingController();
   List<GroceryItem> _items = [];
-  List<PantryItem> _lowStock = [];
   bool _loading = true;
   String? _error;
   String _filter = 'all';
+  EasyEntryMode _mode = EasyEntryMode.list;
+  String _sheetCategory = 'other';
+  bool _bulkBusy = false;
 
   @override
   void initState() {
@@ -38,12 +44,23 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
       _loading = false;
     }
     _load();
+    loadEasyEntryMode('groceries').then((mode) {
+      if (mounted) setState(() => _mode = mode);
+    });
   }
 
   @override
   void dispose() {
     _query.dispose();
+    _quickName.dispose();
+    _sheetName.dispose();
+    _sheetQty.dispose();
     super.dispose();
+  }
+
+  void _setMode(EasyEntryMode mode) {
+    setState(() => _mode = mode);
+    saveEasyEntryMode('groceries', mode);
   }
 
   void _setItems(List<GroceryItem> items) {
@@ -70,12 +87,7 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
       try {
         order = parseModuleListOrder(await api.getPreferences(), 'groceries');
       } catch (_) {}
-      List<PantryItem> low = const [];
-      try {
-        low = (await api.listPantry()).where((p) => p.isLowStock).toList();
-      } catch (_) {}
       if (!mounted) return;
-      _lowStock = low;
       _setItems(applyIdOrder(items, order, (item) => item.id));
     } catch (e) {
       if (!mounted) return;
@@ -84,6 +96,175 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _quickAdd(String name, {String? quantity, String? category}) async {
+    final itemName = name.trim();
+    if (itemName.isEmpty) return;
+    try {
+      final item = await ref.read(vivrantApiProvider).addGrocery({
+        'name': itemName,
+        if (quantity != null && quantity.trim().isNotEmpty)
+          'quantity': quantity.trim(),
+        if (category != null && category.isNotEmpty) 'category': category,
+      });
+      if (!mounted) return;
+      _setItems([..._items, item]);
+      context.showSuccess('Item added');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Future<void> _pasteList(String text) async {
+    setState(() => _bulkBusy = true);
+    try {
+      final added = await ref.read(vivrantApiProvider).addGroceryBulk(text);
+      if (!mounted) return;
+      _setItems([..._items, ...added]);
+      context.showSuccess(
+        'Added ${added.length} item${added.length == 1 ? '' : 's'}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+      rethrow;
+    } finally {
+      if (mounted) setState(() => _bulkBusy = false);
+    }
+  }
+
+  Future<void> _addSheetRow() async {
+    final name = _sheetName.text.trim();
+    if (name.isEmpty) return;
+    await _quickAdd(
+      name,
+      quantity: _sheetQty.text,
+      category: _sheetCategory,
+    );
+    _sheetName.clear();
+    _sheetQty.clear();
+    setState(() => _sheetCategory = 'other');
+  }
+
+  Future<void> _editGrocery(GroceryItem item) async {
+    final draft = await showFieldEditorSheet(
+      context,
+      title: 'Edit item',
+      fields: {
+        'Name': item.name,
+        'Quantity': item.quantity ?? '',
+        'Category': item.category,
+        'Price': item.estimatedPrice?.toStringAsFixed(0) ?? '',
+      },
+    );
+    if (draft == null || !mounted) return;
+    try {
+      const cats = {
+        'produce',
+        'protein',
+        'dairy',
+        'grains',
+        'pantry',
+        'snacks',
+        'drinks',
+        'household',
+        'other',
+      };
+      final category = (draft['Category'] ?? item.category).toLowerCase();
+      final updated = await ref.read(vivrantApiProvider).updateGrocery(item.id, {
+        'name': draft['Name'] ?? item.name,
+        'quantity': draft['Quantity'],
+        'category': cats.contains(category) ? category : item.category,
+        if ((draft['Price'] ?? '').isNotEmpty)
+          'estimated_price': double.tryParse(draft['Price']!),
+      });
+      if (!mounted) return;
+      _setItems([for (final row in _items) row.id == item.id ? updated : row]);
+      context.showSuccess('Item updated');
+    } catch (e) {
+      if (!mounted) return;
+      context.showError(apiErrorMessage(e));
+    }
+  }
+
+  Widget _buildSheet() {
+    const cats = [
+      'produce',
+      'protein',
+      'dairy',
+      'grains',
+      'pantry',
+      'snacks',
+      'drinks',
+      'household',
+      'other',
+    ];
+    final rows = _filtered;
+    return ExcelTable(
+      highlightLastRow: true,
+      headers: const ['Buy', 'Item', 'Qty', 'Cat', '₱', ''],
+      rows: [
+        for (final item in rows)
+          [
+            Checkbox(
+              value: item.isChecked,
+              onChanged: (v) => _toggle(item, v ?? false),
+            ),
+            InkWell(
+              onTap: () => _editGrocery(item),
+              child: Text(
+                item.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  decoration:
+                      item.isChecked ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            Text(item.quantity ?? '—'),
+            Text(item.category),
+            Text(
+              item.estimatedPrice == null
+                  ? '—'
+                  : '₱${item.estimatedPrice!.round()}',
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              onPressed: () => _delete(item),
+            ),
+          ],
+        [
+          const SizedBox.shrink(),
+          ExcelCellField(
+            controller: _sheetName,
+            hint: 'New item',
+            width: 140,
+            onSubmitted: (_) => _addSheetRow(),
+          ),
+          ExcelCellField(
+            controller: _sheetQty,
+            hint: 'qty',
+            width: 72,
+            onSubmitted: (_) => _addSheetRow(),
+          ),
+          ExcelDropdown<String>(
+            value: cats.contains(_sheetCategory) ? _sheetCategory : 'other',
+            items: [
+              for (final c in cats)
+                DropdownMenuItem(value: c, child: Text(c)),
+            ],
+            onChanged: (v) => setState(() => _sheetCategory = v ?? 'other'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: _addSheetRow,
+          ),
+          const SizedBox.shrink(),
+        ],
+      ],
+    );
   }
 
   Future<void> _add() async {
@@ -174,6 +355,8 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
   }
 
   Future<void> _delete(GroceryItem item) async {
+    final ok = await confirmDelete(context, label: item.name);
+    if (!ok || !mounted) return;
     final prev = List<GroceryItem>.from(_items);
     _setItems(_items.where((i) => i.id != item.id).toList());
     try {
@@ -183,167 +366,6 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
     } catch (e) {
       if (!mounted) return;
       _setItems(prev);
-      context.showError(apiErrorMessage(e));
-    }
-  }
-
-  Future<void> _run(Future<void> Function() action, String success) async {
-    try {
-      await action();
-      if (!mounted) return;
-      context.showSuccess(success);
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      context.showError(apiErrorMessage(e));
-    }
-  }
-
-  Future<void> _smartPlan() async {
-    try {
-      final res = await ref.read(vivrantApiProvider).smartGroceryPlan();
-      if (!mounted) return;
-      final planRaw = res['plan'];
-      final plan = planRaw is Map
-          ? Map<String, dynamic>.from(planRaw)
-          : Map<String, dynamic>.from(res);
-      final items = (plan['items'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      final meals = (plan['meals'] as List? ?? [])
-          .map((e) => e.toString())
-          .where((e) => e.isNotEmpty)
-          .toList();
-
-      final add = await showModalBottomSheet<bool>(
-        context: context,
-        showDragHandle: true,
-        isScrollControlled: true,
-        builder: (sheetCtx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  plan['title']?.toString() ?? 'Smart grocery plan',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
-                ),
-                if (plan['summary'] != null) ...[
-                  const SizedBox(height: 8),
-                  Text(plan['summary'].toString()),
-                ],
-                if (plan['budget_note'] != null ||
-                    plan['estimated_total'] != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    [
-                      if (plan['budget_note'] != null)
-                        plan['budget_note'].toString(),
-                      if (plan['estimated_total'] != null)
-                        'Total ~₱${plan['estimated_total']}',
-                    ].join(' · '),
-                    style: Theme.of(sheetCtx).textTheme.bodySmall,
-                  ),
-                ],
-                if (meals.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    'Meal ideas',
-                    style: Theme.of(sheetCtx).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  ...meals.map(
-                    (m) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text('· $m'),
-                    ),
-                  ),
-                ],
-                if (items.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Text(
-                    'Suggested items',
-                    style: Theme.of(sheetCtx).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.sizeOf(sheetCtx).height * 0.35,
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, i) {
-                        final item = items[i];
-                        final price = item['estimated_price'];
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(item['name']?.toString() ?? 'Item'),
-                          subtitle: Text(
-                            [
-                              if (item['quantity'] != null)
-                                item['quantity'].toString(),
-                              if (item['category'] != null)
-                                item['category'].toString(),
-                            ].join(' · '),
-                          ),
-                          trailing: price == null
-                              ? null
-                              : Text(
-                                  '₱$price',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: items.isEmpty
-                        ? null
-                        : () => Navigator.pop(sheetCtx, true),
-                    child: Text(
-                      items.isEmpty
-                          ? 'No items to add'
-                          : 'Add all to shopping list',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-      if (add == true && items.isNotEmpty && mounted) {
-        final added = await ref
-            .read(vivrantApiProvider)
-            .addGroceryPlanItems(items);
-        if (!mounted) return;
-        _setItems([..._items, ...added]);
-        context.showSuccess(
-          'Added ${added.length} item${added.length == 1 ? '' : 's'} to your list',
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
       context.showError(apiErrorMessage(e));
     }
   }
@@ -388,75 +410,61 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Shopping',
               title: 'Grocery',
               highlight: 'list',
             ),
+            EasyEntryToggle(
+              value: _mode,
+              onChanged: _setMode,
+            ),
+            const SizedBox(height: 12),
+            if (_mode == EasyEntryMode.list || _mode == EasyEntryMode.sheet) ...[
+              TextField(
+                controller: _quickName,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'Add with just a name',
+                  hintText: 'e.g. eggs',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () async {
+                      await _quickAdd(_quickName.text);
+                      _quickName.clear();
+                    },
+                  ),
+                ),
+                onSubmitted: (value) async {
+                  await _quickAdd(value);
+                  _quickName.clear();
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_mode == EasyEntryMode.paste) ...[
+              QuickListPaste(
+                pending: _bulkBusy,
+                onSubmit: _pasteList,
+              ),
+              const SizedBox(height: 16),
+            ],
             StatCard(
               label: 'Checked',
               value: '$checked / ${_items.length}',
               caption: 'items',
               icon: Icons.shopping_basket_outlined,
             ),
-            if (_lowStock.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              VivrantPanel(
-                title: 'Low in pantry',
-                trailing: TextButton(
-                  onPressed: () => _run(
-                    () => ref.read(vivrantApiProvider).addLowStockToGrocery(),
-                    'Low stock added to list',
-                  ),
-                  child: const Text('Add all'),
-                ),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final item in _lowStock.take(12))
-                      Chip(
-                        label: Text(
-                          '${item.name} · ${item.stockLevel}%',
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ActionChip(
-                  label: const Text('Clear completed'),
-                  onPressed: () => _run(
-                    () => ref
-                        .read(vivrantApiProvider)
-                        .clearCompletedGroceries(),
-                    'Cleared completed',
-                  ),
-                ),
-                ActionChip(
-                  label: const Text('Restock pantry'),
-                  onPressed: () => _run(
-                    () => ref
-                        .read(vivrantApiProvider)
-                        .restockPantryFromChecked(),
-                    'Pantry restocked',
-                  ),
-                ),
-                ActionChip(
-                  avatar: const Icon(Icons.auto_awesome, size: 16),
-                  label: const Text('Smart plan'),
-                  onPressed: _smartPlan,
-                ),
-              ],
+            const SectionGap(),
+            ModuleTile(
+              icon: Icons.tune_rounded,
+              label: 'List tools',
+              caption: 'Low stock, restock, and smart plan',
+              onTap: () => context.push('/groceries/tools'),
             ),
-            const SizedBox(height: 16),
+            const SectionGap(),
             if (_loading)
               const Center(child: CircularProgressIndicator())
             else if (_error != null)
@@ -467,6 +475,8 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
                   child: const Text('Retry'),
                 ),
               )
+            else if (_mode == EasyEntryMode.sheet)
+              _buildSheet()
             else if (_items.isEmpty)
               EmptyState(
                 message: 'List is empty.',
@@ -558,46 +568,7 @@ class _GroceriesScreenState extends ConsumerState<GroceriesScreen> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.edit_outlined),
-                              onPressed: () async {
-                                final draft = await showFieldEditorSheet(
-                                  context,
-                                  title: 'Edit item',
-                                  fields: {
-                                    'Name': item.name,
-                                    'Quantity': item.quantity ?? '',
-                                    'Category': item.category,
-                                    'Price': item.estimatedPrice?.toStringAsFixed(0) ?? '',
-                                  },
-                                );
-                                if (draft == null || !mounted) return;
-                                try {
-                                  const cats = {
-                                    'produce',
-                                    'protein',
-                                    'dairy',
-                                    'grains',
-                                    'pantry',
-                                    'snacks',
-                                    'drinks',
-                                    'household',
-                                    'other',
-                                  };
-                                  final category = (draft['Category'] ?? item.category).toLowerCase();
-                                  final updated = await ref.read(vivrantApiProvider).updateGrocery(item.id, {
-                                    'name': draft['Name'] ?? item.name,
-                                    'quantity': draft['Quantity'],
-                                    'category': cats.contains(category) ? category : item.category,
-                                    if ((draft['Price'] ?? '').isNotEmpty)
-                                      'estimated_price': double.tryParse(draft['Price']!),
-                                  });
-                                  if (!mounted) return;
-                                  _setItems([for (final row in _items) row.id == item.id ? updated : row]);
-                                  context.showSuccess('Item updated');
-                                } catch (e) {
-                                  if (!mounted) return;
-                                  context.showError(apiErrorMessage(e));
-                                }
-                              },
+                              onPressed: () => _editGrocery(item),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline),

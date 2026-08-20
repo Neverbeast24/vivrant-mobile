@@ -1,31 +1,33 @@
 # VIVRΛNT Mobile REST API Specification
 
-> Feed this document into the **viva-server** (`vivrant-server`) repo to implement the mobile REST surface consumed by the Flutter app in **vivrant-mobile**.
+> Live REST contract for the Flutter app. Implemented on **vivrant-server** under `/api/mobile/**`. Product overview: [VIVRANT_Complete_Documentation.md](https://github.com/Neverbeast24/vivrant-server/blob/main/docs/VIVRANT_Complete_Documentation.md) · Flutter guide: [VIVRANT_Mobile_Documentation.md](./VIVRANT_Mobile_Documentation.md).
 
-**Audience:** backend / Next.js engineers  
+**Audience:** backend / Next.js and Flutter engineers  
 **Client:** Flutter iOS + Android (`vivrant_mobile`)  
 **Base URL:** same host as VIVRΛNT Web (e.g. `https://your-app.vercel.app`)  
 **Auth:** `Authorization: Bearer <supabase_access_token>` on all `/api/mobile/*` routes  
-**Content-Type:** `application/json`
+**Content-Type:** `application/json`  
+**Last updated:** 20 August 2026
 
 ---
 
 ## 1. Why this exists
 
-VIVRΛNT Web currently runs most member domain logic as **Next.js Server Actions** (cookie sessions). Native mobile cannot call Server Actions reliably. The Flutter app therefore expects a **JSON REST catalog** under `/api/mobile/*` that mirrors those actions and returns Supabase JWT sessions for auth.
+VIVRΛNT Web runs most member domain logic as **Next.js Server Actions** (cookie sessions). Native mobile cannot call Server Actions reliably, so Flutter uses a **JSON REST catalog** under `/api/mobile/*` that mirrors those actions and returns Supabase JWT sessions for auth.
 
-Existing HTTP routes to **keep / extend**:
+This catalog is **implemented**. Keep web Server Actions and mobile routes on the same tables and Gemini helpers — do not invent parallel schemas.
+
+Shared platform routes (cookie or Bearer):
 
 | Method | Path | Notes |
 |--------|------|--------|
-| `POST` | `/api/auth/login` | **Extend** to return `access_token` + `refresh_token` for mobile |
-| `POST` | `/api/auth/signup` | Keep; return session tokens when email confirmation is off |
-| `POST` | `/api/auth/forgot-password` | Keep |
-| `POST` | `/api/auth/reset-password` | Keep |
-| `GET` | `/api/search?q=` | Keep; accept Bearer |
-| `POST`/`DELETE` | `/api/device-tokens` | Keep (already supports Bearer) |
-
-New routes: everything under **`/api/mobile/**`** below.
+| `POST` | `/api/auth/login` | Returns `access_token` + `refresh_token` for mobile; also sets cookies |
+| `POST` | `/api/auth/signup` | Session tokens when email confirmation is off |
+| `POST` | `/api/auth/forgot-password` | |
+| `POST` | `/api/auth/reset-password` | Recovery session |
+| `POST` | `/api/auth/change-password` | `{ currentPassword, password }` |
+| `GET` | `/api/search?q=` | Accept Bearer |
+| `POST`/`DELETE` | `/api/device-tokens` | FCM registration (Bearer) |
 
 ---
 
@@ -154,6 +156,10 @@ Returns `{ "profile": Profile }`.
 Body: subset of profile health fields (`display_name`, `birth_date`, `sex`, `height_cm`, `weight_kg`, `goal_weight_kg`, `activity_level`, `health_focus`, `daily_step_goal`, `daily_water_goal_ml`, `bio`, …).  
 Mirrors `saveHealthProfile`.
 
+### `GET /api/mobile/settings/preferences`
+
+Returns `{ "settings": UserSettings | null }` (`theme`, `notifications_enabled`, `weekly_report_enabled`, `timezone`, `list_order`).
+
 ### `PUT /api/mobile/settings/preferences`
 
 ```json
@@ -166,6 +172,14 @@ Mirrors `saveHealthProfile`.
 ```
 
 Mirrors `saveSettings` → `user_settings`.
+
+### `PATCH /api/mobile/settings/preferences`
+
+Save a module list order (groceries, pantry, habits, goals, reminders):
+
+```json
+{ "module": "groceries", "ids": [3, 1, 2] }
+```
 
 ### `POST /api/mobile/profile/avatar`
 
@@ -216,9 +230,12 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 |--------|------|---------|
 | `GET` | `/api/mobile/nutrition/meals?date=YYYY-MM-DD` | list `nutrition_logs` |
 | `POST` | `/api/mobile/nutrition/meals` | `logMeal` |
-| `DELETE` | `/api/mobile/nutrition/meals/:id` | `deleteMeal` |
+| `PATCH` | `/api/mobile/nutrition/meals/:id` | update meal |
+| `DELETE` | `/api/mobile/nutrition/meals/:id` | archive meal (soft delete) |
+| `POST` | `/api/mobile/nutrition/meals/bulk` | `{ "text": "…" }` or `{ "items": […] }` (max 20) |
 | `POST` | `/api/mobile/nutrition/water` | `addWaterIntake` |
-| `POST` | `/api/mobile/nutrition/estimate` | `estimateMealWithAi` |
+| `POST` | `/api/mobile/nutrition/estimate` | `estimateMealWithAi` (optional image) |
+| `POST` | `/api/mobile/nutrition/suggest` | `suggestMeal` |
 
 **POST meal body**
 
@@ -266,7 +283,8 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 |--------|------|---------|
 | `GET` | `/api/mobile/movement/workouts?date=` | list |
 | `POST` | `/api/mobile/movement/workouts` | `logWorkout` |
-| `DELETE` | `/api/mobile/movement/workouts/:id` | `deleteWorkout` |
+| `PATCH` | `/api/mobile/movement/workouts/:id` | update |
+| `DELETE` | `/api/mobile/movement/workouts/:id` | archive |
 | `POST` | `/api/mobile/movement/suggest` | `suggestWorkoutWithAi` |
 
 **POST workout**
@@ -290,10 +308,15 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 | `GET` | `/api/mobile/gym/exercises?equipment=` | `gym_exercises` catalog |
 | `GET` | `/api/mobile/gym/sessions` | list |
 | `POST` | `/api/mobile/gym/sessions` | `logGymSession` |
-| `DELETE` | `/api/mobile/gym/sessions/:id` | `deleteGymSession` |
+| `PATCH` | `/api/mobile/gym/sessions/:id` | update |
+| `DELETE` | `/api/mobile/gym/sessions/:id` | archive |
+| `GET`/`PUT`/`DELETE` | `/api/mobile/gym/sessions/live` | live rest timer + checks (`gym_live_sessions`) |
 | `GET` | `/api/mobile/gym/plans` | list (includes `days[]`, `summary`, `level`) |
+| `PATCH` | `/api/mobile/gym/plans/:id` | edit saved program |
+| `DELETE` | `/api/mobile/gym/plans/:id` | archive |
 | `POST` | `/api/mobile/gym/plans/ai` | `createAiGymPlan` — optional prefs body below |
-| `DELETE` | `/api/mobile/gym/plans/:id` | `deleteGymPlan` |
+| `GET`/`PUT`/`POST`/`DELETE` | `/api/mobile/gym/plans/draft` | program builder draft |
+| `POST` | `/api/mobile/gym/plans/draft/commit` | save draft as a plan |
 | `POST` | `/api/mobile/gym/machines/recommend` | `recommendMachinesWithAi` |
 
 **POST AI plan prefs (optional)**
@@ -358,6 +381,7 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 
 - `GET /api/mobile/habits` — include `done_today: boolean`
 - `POST /api/mobile/habits` → `{ "title": "…" }`
+- `PATCH /api/mobile/habits/:id`
 - `POST /api/mobile/habits/:id/toggle` → `{ "done": true }`
 - `DELETE /api/mobile/habits/:id`
 - `POST /api/mobile/habits/suggest` → AI suggestions
@@ -376,8 +400,9 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 - `POST /api/mobile/groceries`  
   `{ "name", "quantity?", "category?", "estimated_price?" }`  
   Categories: `produce|protein|dairy|grains|pantry|snacks|drinks|household|other`
-- `PATCH /api/mobile/groceries/:id` → `{ "is_checked": true }`
+- `PATCH /api/mobile/groceries/:id` → `{ "is_checked": true }` (also name/qty/category/price)
 - `DELETE /api/mobile/groceries/:id`
+- `POST /api/mobile/groceries/bulk` → `{ "text": "…" }` pasted list
 - `POST /api/mobile/groceries/clear-completed`
 - `POST /api/mobile/groceries/restock-pantry`
 - `POST /api/mobile/groceries/plan` → `generateSmartGroceryPlan`
@@ -390,6 +415,7 @@ Upsert `daily_checkins` on `(user_id, checkin_date)` — same as `saveCheckin`.
 - `POST /api/mobile/pantry` → `{ "name", "category", "stock_level": 0-100 }`
 - `PATCH /api/mobile/pantry/:id` → `{ "stock_level": 40 }`
 - `DELETE /api/mobile/pantry/:id`
+- `POST /api/mobile/pantry/bulk` → `{ "text": "…" }`
 - `POST /api/mobile/pantry/low-stock-to-grocery`
 
 Low-stock threshold: **≤ 25** (same as web).
@@ -404,6 +430,7 @@ Low-stock threshold: **≤ 25** (same as web).
   `{ "title", "category": "food|fitness|supplements|wellness|other", "amount", "spent_at?" }`
 - `PATCH /api/mobile/spending/expenses/:id`
 - `DELETE /api/mobile/spending/expenses/:id`
+- `POST /api/mobile/spending/expenses/bulk` → `{ "text": "…" }`
 - `PUT /api/mobile/spending/budget` → `{ "amount": 5000 }` → `profiles.monthly_health_budget`
 - `POST /api/mobile/spending/coach`
 
@@ -427,6 +454,7 @@ Low-stock threshold: **≤ 25** (same as web).
 - `DELETE /api/mobile/ai/reminders/:id`
 - `POST /api/mobile/ai/reminders/draft`
 - `POST /api/mobile/ai/reminders/sync-gym-plan`
+- `POST /api/mobile/ai/reminders/sync-today`
 
 ### Goals
 
@@ -485,9 +513,35 @@ Authorization: Bearer …
 
 Ensure Bearer works the same as cookies.
 
+### Archive
+
+Deletes in member modules are **soft deletes**. Restore from Archived; members cannot hard-delete.
+
+- `GET /api/mobile/archive` → `{ "items": [{ "id", "entity", "entity_id", "title", "deleted_at" }] }`
+- `POST /api/mobile/archive` `{ "id": <archived_records.id> }` → restore
+- `GET /api/mobile/archive/export` → `{ "dump": { taken_at, user_id, tables } }` JSON backup
+
+Archivable `entity` values: `nutrition_logs`, `workout_logs`, `expenses`, `pantry_items`, `grocery_items`, `health_goals`, `health_history`, `gym_sessions`, `gym_plans`, `habits`, `challenges`, `journal_entries`, `user_reminders`.
+
 ---
 
-## 13. Profile type (shared)
+## 13. Staff admin (Bearer + `admin` / `super_admin`)
+
+| Method | Path | Who |
+|--------|------|-----|
+| `GET` | `/api/mobile/admin/overview` | admin+ |
+| `GET` | `/api/mobile/admin/users` | admin+ |
+| `PATCH` | `/api/mobile/admin/users/:id` | admin+ — role / status |
+| `GET` / `PATCH` | `/api/mobile/admin/tickets` | admin+ |
+| `GET` | `/api/mobile/admin/roles` | admin+ |
+| `GET` | `/api/mobile/admin/audit` | admin+ |
+| `GET` / `POST` | `/api/mobile/admin/settings` | admin+ — health + broadcast |
+| `GET` | `/api/mobile/admin/activity` | super_admin |
+| `GET` / `PATCH` | `/api/mobile/admin/inquiries` | super_admin |
+
+---
+
+## 14. Profile type (shared)
 
 ```ts
 type Profile = {
@@ -516,22 +570,19 @@ type Profile = {
 
 ---
 
-## 14. Implementation checklist (for viva-server)
+## 15. Implementation status
 
-1. [ ] Create `src/lib/mobile/auth.ts` helper: Bearer → Supabase user (copy from device-tokens).
-2. [ ] Extend `POST /api/auth/login` (+ signup) to return `access_token` / `refresh_token`.
-3. [ ] Add `src/app/api/mobile/**/route.ts` modules grouped by domain (nutrition, movement, gym, …).
-4. [ ] Extract shared domain functions from Server Actions so web + mobile share logic.
-5. [ ] Wire Gemini calls through existing `src/lib/ai/gemini.ts` (never expose `GEMINI_API_KEY` to Flutter).
-6. [ ] Ensure RLS still applies; never use the service role for member CRUD unless required.
-7. [ ] CORS: allow mobile origins only if you add a public web wrapper; native apps don’t need browser CORS, but Expo/web builds might.
-8. [ ] Document deployed base URL for Flutter `--dart-define=API_BASE_URL=…`.
-9. [ ] Smoke-test each endpoint with a Bearer token from Supabase Auth.
-10. [ ] Keep `/api/device-tokens` as the FCM registration path for Android/iOS.
+The catalog is live in `viva-server` (`src/app/api/mobile/**`, `src/lib/mobile/auth.ts`). When adding a route:
+
+1. Call the same Supabase tables + Gemini helpers as the matching Server Action.
+2. Keep RLS; use the service role only for restore/backup/admin reads that RLS cannot do.
+3. Never expose `GEMINI_API_KEY` to Flutter.
+4. Smoke-test with a Bearer token from `POST /api/auth/login`.
+5. Keep `/api/device-tokens` as the FCM path.
 
 ---
 
-## 15. Flutter client mapping
+## 16. Flutter client mapping
 
 | Flutter service method | Endpoint |
 |------------------------|----------|
@@ -541,35 +592,28 @@ type Profile = {
 | `VivrantApi.logWorkout` | `POST /api/mobile/movement/workouts` |
 | `VivrantApi.askAi` | `POST /api/mobile/ai/chat` |
 | `VivrantApi.registerDeviceToken` | `POST /api/device-tokens` |
-| … | See `lib/data/vivrant_api.dart` for the full list |
+| … | See `lib/data/api/` for the full list |
 
-Config defines:
+---
+
+## 17. Out of scope for mobile API
+
+- Public marketing pages (`/`, `/about`, `/pricing`, `/contact`)
+- Firebase messaging service worker JS
+- Cron secret routes (`/api/cron/reminders`, `/api/cron/backup`) — server-only
+- Direct Gemini or Supabase secret-key access from Flutter
+
+Staff **admin JSON routes are in scope** (section 13). The richest admin UI remains on web.
+
+---
+
+## 18. Config
 
 ```bash
 flutter run --dart-define=API_BASE_URL=https://your-vivrant-host.vercel.app
 ```
 
-Android emulator localhost → host machine: `http://10.0.2.2:3000` (default in `lib/config/env.dart`).
-
----
-
-## 16. Out of scope for mobile API
-
-- Admin console (`/admin/*`) — staff stays on web
-- Marketing contact inquiries
-- Firebase messaging service worker JS
-- Cron secret routes (`/api/cron/reminders`) — server-only
-
----
-
-## 17. Priority order (suggested)
-
-1. Auth tokens + profile + today check-in  
-2. Nutrition, movement, hydration  
-3. Spending, groceries, pantry  
-4. Gym sessions/plans  
-5. AI chat / insights / weekly story  
-6. Sleep, mindfulness, journal, habits  
-7. Goals, health history, notifications, support  
-
-Ship vertical slices so Flutter screens light up as each group lands.
+Android emulator localhost → host machine: `http://10.0.2.2:3000` (default in `lib/config/env.dart`).  
+iOS simulator: `http://127.0.0.1:3000`.  
+Physical device: `http://<pc-lan-ip>:3000`.  
+Release builds require `https://`.

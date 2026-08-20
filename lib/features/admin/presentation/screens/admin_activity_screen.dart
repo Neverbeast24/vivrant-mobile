@@ -117,7 +117,7 @@ class _AdminActivityScreenState extends ConsumerState<AdminActivityScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: VivrantLayout.pagePadding,
           children: [
             const PageHeader(
               eyebrow: 'Super Admin',

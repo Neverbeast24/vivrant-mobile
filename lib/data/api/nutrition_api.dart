@@ -1,5 +1,6 @@
 part of '../vivrant_api.dart';
 
+/// Meal log, macros, and AI meal estimate.
 extension VivrantNutritionApi on VivrantApi {
   Future<List<NutritionLog>> listMeals({String? date}) async {
     final res = await _client.get<Map<String, dynamic>>(
@@ -20,6 +21,16 @@ extension VivrantNutritionApi on VivrantApi {
     return NutritionLog.fromJson(
       Map<String, dynamic>.from(res.data?['meal'] ?? res.data ?? {}),
     );
+  }
+
+  Future<List<NutritionLog>> logMealsBulk(String text) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/mobile/nutrition/meals/bulk',
+      data: {'text': text},
+    );
+    return (res.data?['meals'] as List? ?? [])
+        .map((e) => NutritionLog.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   Future<void> deleteMeal(int id) async {

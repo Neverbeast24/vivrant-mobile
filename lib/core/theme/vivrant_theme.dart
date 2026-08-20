@@ -11,9 +11,9 @@ abstract final class VivrantTheme {
       brightness: Brightness.light,
       colorScheme: ColorScheme.light(
         primary: VivrantColors.accent,
-        onPrimary: Colors.white,
+        onPrimary: VivrantColors.onAccent,
         secondary: VivrantColors.cyan,
-        onSecondary: Colors.white,
+        onSecondary: VivrantColors.onAccent,
         surface: VivrantColors.card,
         onSurface: VivrantColors.ink,
         error: const Color(0xFFB42318),
@@ -31,9 +31,9 @@ abstract final class VivrantTheme {
       brightness: Brightness.dark,
       colorScheme: ColorScheme.dark(
         primary: VivrantColors.darkAccent,
-        onPrimary: VivrantColors.darkSolid,
+        onPrimary: VivrantColors.darkOnAccent,
         secondary: VivrantColors.darkCyan,
-        onSecondary: VivrantColors.darkSolid,
+        onSecondary: VivrantColors.darkOnAccent,
         surface: VivrantColors.darkCard,
         onSurface: VivrantColors.darkInk,
         error: const Color(0xFFF97066),
@@ -61,6 +61,7 @@ abstract final class VivrantTheme {
     final display = GoogleFonts.bricolageGrotesqueTextTheme(body);
 
     return base.copyWith(
+      canvasColor: card,
       textTheme: display.copyWith(
         displayLarge: display.displayLarge?.copyWith(
           fontWeight: FontWeight.w700,
@@ -118,7 +119,7 @@ abstract final class VivrantTheme {
         fillColor: dark
             ? VivrantColors.darkSurfaceSoft
             : VivrantColors.surface.withValues(alpha: 0.7),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: ink.withValues(alpha: 0.1)),
@@ -143,7 +144,7 @@ abstract final class VivrantTheme {
           backgroundColor: inverse,
           foregroundColor: inverseFg,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: GoogleFonts.spaceGrotesk(
             fontWeight: FontWeight.w800,
@@ -155,7 +156,7 @@ abstract final class VivrantTheme {
         style: FilledButton.styleFrom(
           backgroundColor: inverse,
           foregroundColor: inverseFg,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
@@ -163,19 +164,49 @@ abstract final class VivrantTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: ink,
           side: BorderSide(color: ink.withValues(alpha: 0.14)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: dark
+        backgroundColor: panel,
+        selectedColor: dark
             ? VivrantColors.darkAccentSoft
             : VivrantColors.accentSoft,
-        labelStyle: TextStyle(color: accent, fontWeight: FontWeight.w700),
-        side: BorderSide.none,
+        labelStyle: TextStyle(color: ink, fontWeight: FontWeight.w700),
+        secondaryLabelStyle: TextStyle(color: accent, fontWeight: FontWeight.w700),
+        side: BorderSide(color: ink.withValues(alpha: 0.12)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
       dividerTheme: DividerThemeData(color: ink.withValues(alpha: 0.08)),
+      popupMenuTheme: PopupMenuThemeData(
+        color: card,
+        textStyle: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600),
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(card),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: card,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: card,
+        surfaceTintColor: Colors.transparent,
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return Colors.transparent;
+        }),
+        checkColor: WidgetStatePropertyAll(
+          dark ? VivrantColors.darkOnAccent : VivrantColors.onAccent,
+        ),
+        side: BorderSide(color: ink.withValues(alpha: 0.35), width: 1.8),
+      ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: panel,
         selectedItemColor: accent,
@@ -207,6 +238,16 @@ abstract final class VivrantTheme {
           );
         }),
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: dark ? VivrantColors.darkCard : VivrantColors.panel,
         contentTextStyle: GoogleFonts.spaceGrotesk(
@@ -220,6 +261,39 @@ abstract final class VivrantTheme {
         elevation: 6,
         insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return dark ? VivrantColors.darkOnAccent : VivrantColors.onAccent;
+          }
+          return muted;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return ink.withValues(alpha: 0.18);
+        }),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: accent,
+        inactiveTrackColor: ink.withValues(alpha: 0.12),
+        thumbColor: accent,
+        overlayColor: accent.withValues(alpha: 0.16),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return ink.withValues(alpha: 0.45);
+        }),
+      ),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: card,
+        headerBackgroundColor: accent,
+        headerForegroundColor:
+            dark ? VivrantColors.darkOnAccent : VivrantColors.onAccent,
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: card,
       ),
     );
   }

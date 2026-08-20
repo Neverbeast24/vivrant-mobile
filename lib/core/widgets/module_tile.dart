@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../theme/vivrant_colors.dart';
+import '../theme/vivrant_layout.dart';
+import '../theme/vivrant_motion.dart';
+import 'icon_well.dart';
 
 /// Navigation tile for the More menu and module grids.
-class ModuleTile extends StatelessWidget {
+class ModuleTile extends StatefulWidget {
   const ModuleTile({
     super.key,
     required this.icon,
@@ -18,63 +21,85 @@ class ModuleTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<ModuleTile> createState() => _ModuleTileState();
+}
+
+class _ModuleTileState extends State<ModuleTile> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final c = VivrantColors.of(context);
-    return Material(
-      color: Theme.of(context).cardTheme.color,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: c.ink.withValues(alpha: 0.08)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: c.accentSoft,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: c.accent, size: 20),
+    return AnimatedScale(
+      scale: _pressed ? 0.975 : 1,
+      duration: VivrantMotion.fast,
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: widget.onTap,
+          onHighlightChanged: (value) => setState(() => _pressed = value),
+          child: AnimatedContainer(
+            duration: VivrantMotion.base,
+            curve: VivrantMotion.enter,
+            constraints: const BoxConstraints(minHeight: VivrantLayout.minTap),
+            padding: VivrantLayout.rowPadding,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: c.ink.withValues(alpha: _pressed ? 0.14 : 0.08),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        height: 1.25,
-                        color: c.ink,
+              boxShadow: [
+                BoxShadow(
+                  color: c.accent.withValues(alpha: c.dark ? 0.10 : 0.05),
+                  blurRadius: _pressed ? 8 : 18,
+                  offset: Offset(0, _pressed ? 2 : 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                IconWell(icon: widget.icon),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.label,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          height: 1.25,
+                          color: c.ink,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      caption,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: c.ink.withValues(alpha: 0.62),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                          ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.caption,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: c.ink.withValues(alpha: 0.62),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              height: 1.3,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: c.ink.withValues(alpha: 0.35),
-              ),
-            ],
+                AnimatedSlide(
+                  duration: VivrantMotion.fast,
+                  curve: VivrantMotion.enter,
+                  offset: _pressed ? const Offset(0.18, 0) : Offset.zero,
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: c.ink.withValues(alpha: 0.35),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

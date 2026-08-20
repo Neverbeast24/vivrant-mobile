@@ -90,15 +90,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final panel = dark ? VivrantColors.darkPanel : Colors.white;
 
     return GradientScaffold(
-      child: Stack(
-        children: [
-          const _AuthAtmosphere(),
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fade,
-              child: SlideTransition(
-                position: _slide,
-                child: ListView(
+      child: SafeArea(
+        child: FadeTransition(
+          opacity: _fade,
+          child: SlideTransition(
+            position: _slide,
+            child: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
                   children: [
                     const Align(
@@ -331,9 +328,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ),
             ),
           ),
-        ],
-      ),
-    );
+        );
   }
 }
 
@@ -558,71 +553,6 @@ class _FeatureTile extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Soft botanical blobs behind the auth form.
-class _AuthAtmosphere extends StatelessWidget {
-  const _AuthAtmosphere();
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final a = dark ? VivrantColors.darkAccent : VivrantColors.accent;
-    final c = dark ? VivrantColors.darkCyan : VivrantColors.cyan;
-
-    return IgnorePointer(
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: [
-          Positioned(
-            top: -80,
-            right: -60,
-            child: _Blob(
-              size: 220,
-              color: a.withValues(alpha: dark ? 0.18 : 0.12),
-            ),
-          ),
-          Positioned(
-            top: 220,
-            left: -100,
-            child: _Blob(
-              size: 200,
-              color: c.withValues(alpha: dark ? 0.14 : 0.08),
-            ),
-          ),
-          Positioned(
-            bottom: 60,
-            right: -50,
-            child: _Blob(
-              size: 160,
-              color: a.withValues(alpha: dark ? 0.12 : 0.06),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, color.withValues(alpha: 0)],
-        ),
       ),
     );
   }

@@ -161,7 +161,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+          padding: VivrantLayout.pagePadding,
           children: [
             PageHeader(
               eyebrow: 'Inbox',

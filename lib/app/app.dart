@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/env.dart';
@@ -8,6 +9,7 @@ import '../shared/providers/auth_provider.dart';
 import '../shared/providers/theme_provider.dart';
 import 'router.dart';
 
+/// Root widget: theme, router, snackbar messenger, and idle-session warning.
 class VivrantApp extends ConsumerWidget {
   const VivrantApp({super.key});
 
@@ -53,7 +55,15 @@ class VivrantApp extends ConsumerWidget {
                     ink: colorScheme.onSurface,
                     muted: colorScheme.onSurfaceVariant,
                     accent: colorScheme.primary,
-                  ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 280.ms)
+                      .slideY(
+                        begin: 0.12,
+                        end: 0,
+                        duration: 380.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
                 ),
             ],
           ),
@@ -116,7 +126,7 @@ class _IdleWarningBanner extends StatelessWidget {
                 onPressed: onStay,
                 style: FilledButton.styleFrom(
                   backgroundColor: accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: VivrantColors.of(context).onAccent,
                   shape: const StadiumBorder(),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,

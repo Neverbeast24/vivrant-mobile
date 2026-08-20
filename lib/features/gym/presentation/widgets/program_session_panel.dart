@@ -10,8 +10,8 @@ import '../../../../core/utils/context_extensions.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../data/vivrant_api.dart';
 import '../../../../shared/providers/persistent_store.dart';
-import '../gym_labels.dart';
-import '../gym_rest_alert.dart';
+import '../../data/gym_labels.dart';
+import '../../data/gym_rest_alert.dart';
 
 class ProgramSessionPanel extends ConsumerStatefulWidget {
   const ProgramSessionPanel({
@@ -671,9 +671,7 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? VivrantColors.darkInk
-                    : VivrantColors.ink,
+                color: c.solid,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Row(
@@ -684,16 +682,16 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
                       children: [
                         Text(
                           'REST · $_restLabel',
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: c.solidFg.withValues(alpha: 0.7),
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         Text(
                           formatRestClock(_restLeft),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: c.solidFg,
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
                           ),
@@ -708,13 +706,14 @@ class _ProgramSessionPanelState extends ConsumerState<ProgramSessionPanel>
                       child: CircularProgressIndicator(
                         value: _restLeft / _restTotal,
                         color: c.accent,
-                        backgroundColor: Colors.white24,
+                        backgroundColor: c.solidFg.withValues(alpha: 0.24),
                         strokeWidth: 3,
                       ),
                     ),
                   const SizedBox(width: 8),
                   TextButton(
                     onPressed: _skipRest,
+                    style: TextButton.styleFrom(foregroundColor: c.solidFg),
                     child: const Text('Skip'),
                   ),
                 ],

@@ -56,7 +56,7 @@ class WellnessPulseBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 onTap: () => context.push(items[i].href),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Column(
                     children: [
                       Text(
@@ -74,7 +74,7 @@ class WellnessPulseBar extends StatelessWidget {
               ),
             ),
           ),
-          if (i < items.length - 1) const SizedBox(width: 8),
+          if (i < items.length - 1) const SizedBox(width: 12),
         ],
       ],
     );

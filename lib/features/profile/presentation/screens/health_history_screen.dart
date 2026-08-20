@@ -227,7 +227,7 @@ class _HealthHistoryScreenState extends ConsumerState<HealthHistoryScreen>
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: VivrantLayout.pagePadding,
           children: [
             FadeTransition(
               opacity: CurvedAnimation(
